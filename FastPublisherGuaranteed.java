@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples.perf;
+package com.solace.samples.aaron;
 
 import java.util.Arrays;
 import java.util.LinkedList;

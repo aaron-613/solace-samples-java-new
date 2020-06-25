@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples.perf;
+package com.solace.samples.aaron;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -36,8 +36,8 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class FastDirectPublisher {
     
-    static final int MSG_RATE = 5000;  // Note: Standard edition PubSub+ broker is limited to 10k max ingress
-    static final int PAYLOAD_SIZE = 300;
+    static final int MSG_RATE = 5;  // Note: Standard edition PubSub+ broker is limited to 10k max ingress
+    static final int PAYLOAD_SIZE = 256;
     static volatile boolean shutdown = false;
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
@@ -68,9 +68,11 @@ public class FastDirectPublisher {
         if (args.length > 2) { 
             properties.setProperty(JCSMPProperties.PASSWORD, args[2]); // client-password
         }
+        //properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS,true);
         JCSMPChannelProperties cp = new JCSMPChannelProperties();
         cp.setTcpNoDelay(false);  // high throughput magic sauce... but will hurt latencies a bit
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,cp);
+        cp.setCompressionLevel(9);
+        //properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,cp);
         final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
 
         /** Anonymous inner-class for handling publishing events */
@@ -97,7 +99,7 @@ public class FastDirectPublisher {
             @Override
             public void run() {
                 final int APPROX_NANOS_BETWEEN_MSGS = (1_000_000_000 / MSG_RATE);  // won't be exactly the message rate, but close
-                Topic topic = JCSMPFactory.onlyInstance().createTopic("aaron/test/topic");
+                Topic topic; // = JCSMPFactory.onlyInstance().createTopic("aaron/test/topic");
                 BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
                 byte[] payload = new byte[PAYLOAD_SIZE];
                 long curNanoTime = System.nanoTime();  // grab the current time before the start of the loop
@@ -107,12 +109,13 @@ public class FastDirectPublisher {
                         characterOfTheMoment = (char)((curNanoTime%26)+65);
                         Arrays.fill(payload,(byte)characterOfTheMoment);  // fill it with some "random" value
                         message.setData(payload);
+                        //message.setSequenceNumber(37373773);
                         // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
                         topic = JCSMPFactory.onlyInstance().createTopic(new StringBuilder("aaron/test/").append(characterOfTheMoment).toString());
                         prod.send(message,topic);
                         message.reset();  // reuse this message on the next loop, to avoid having to recreate it
 
-                        //while (System.nanoTime() < (curNanoTime + APPROX_NANOS_BETWEEN_MSGS)) { /* SPIN HARD */ }
+                        while (System.nanoTime() < (curNanoTime + APPROX_NANOS_BETWEEN_MSGS)) { /* SPIN HARD */ }
                             // BUSY WAIT!  (instead of Thread.sleep)
                             // burns more CPU, but provides more accurate publish rate
                             // comment out the "while" statement to publish as fast as possible

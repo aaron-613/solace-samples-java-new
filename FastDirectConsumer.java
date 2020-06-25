@@ -17,17 +17,19 @@
  * under the License.
  */
 
-package com.solace.samples.perf;
+package com.solace.samples.aaron;
 
 import java.io.IOException;
 
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPGlobalProperties;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
+import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
@@ -40,7 +42,7 @@ public class FastDirectConsumer {
     private static volatile boolean shutdown = false;
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
-
+    	// mr4yqbkp31ewl.messaging.solace.cloud:20417 solace-cloud-client@msgvpn-bkvuibog7nf p0mqc6ebbl224ghncfluljcfe2
         // Check command line arguments
         if (args.length < 2 || args[1].split("@").length != 2) {
             System.out.println("Usage: FastDirectConsumer <host:port> <client-username@message-vpn> [client-password]");
@@ -66,6 +68,11 @@ public class FastDirectConsumer {
         if (args.length > 2) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[2]); // client-password
         }
+        JCSMPChannelProperties cp = new JCSMPChannelProperties();
+        cp.setTcpNoDelay(false);  // high throughput magic sauce... but will hurt latencies a bit
+        //cp.setCompressionLevel(9);
+        cp.setReconnectRetries(0);
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,cp);
         //properties.setProperty(JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR,true);  // use only 1 thread instead of 2, but hurts throughput 
         {  // this next block is probably unnecessary until receiving > 100k msg/s, so delete if going slower than that
             JCSMPGlobalProperties gp = new JCSMPGlobalProperties();
@@ -90,6 +97,7 @@ public class FastDirectConsumer {
                     //  c) use multiple-threads or shared subscriptions for parallel processing
                     discardFlag = true;  // set my own flag
                 }
+                System.out.println(msg.getSequenceNumber());
                 // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
                 if (doSomeSillyVerifyingOfData) {
                     // as set in the publisher code, the payload should be filled with the same character as the last letter of the topic
@@ -109,8 +117,12 @@ public class FastDirectConsumer {
             @Override
             public void onException(JCSMPException e) {
                 // uh oh!
-                System.err.println("We've had an exception thrown to the Consumer's onException()");
+                System.err.println("### We've had an exception thrown to the Consumer's onException()");
                 e.printStackTrace();
+                if (e instanceof JCSMPTransportException) {  // pretty bad, not recoverable
+                	// means that all the reconnection attempts have failed
+                	shutdown = true;  // let's quit
+                }
             }
         });
 
@@ -119,7 +131,7 @@ public class FastDirectConsumer {
         session.addSubscription(topic);
         cons.start();
 
-        Runnable statsThread = new Runnable() {
+        Runnable statsRunnable = new Runnable() {
             @Override
             public void run() {
                 try {
@@ -138,7 +150,7 @@ public class FastDirectConsumer {
                 }
             }
         };
-        Thread t = new Thread(statsThread,"Stats Thread");
+        Thread t = new Thread(statsRunnable,"Stats Thread");
         t.setDaemon(true);
         t.start();
         
