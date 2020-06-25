@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -29,8 +30,9 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class HelloWorldPubSub {
     
-    private static final CountDownLatch shutdownLatch = new CountDownLatch(1);
-    static String topicLevel3 = "default";
+    private static final CountDownLatch shutdownGate = new CountDownLatch(1);
+    private static final String topicPrefix = "hello/world";
+    private static volatile String topicLevel3 = "default";
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         // Check command line arguments
@@ -47,6 +49,9 @@ public class HelloWorldPubSub {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnecting
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(5);
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
 			@Override
 			public void handleEvent(SessionEventArgs event) {
@@ -68,9 +73,9 @@ public class HelloWorldPubSub {
 
             @Override
             public void onException(JCSMPException e) {  // uh oh!
-                System.out.printf("### %d MessageListener's onException(): %s%n",System.currentTimeMillis(),e);
+                System.out.printf("### MessageListener's onException(): %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    shutdownLatch.countDown();
+                    shutdownGate.countDown();
                 }
             }
         });
@@ -85,17 +90,17 @@ public class HelloWorldPubSub {
             
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-                System.out.printf("### %d Producer handleErrorEx() callback: %s%n",System.currentTimeMillis(),cause);
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    shutdownLatch.countDown();
+                    shutdownGate.countDown();
                 }
             }
         }, null);  // null is the ProducerEvent handler... don't need it in this simple application
 
         // NOW START APPLICATION /////////////////////////////////////////////////////////////////////////////////////////////////
         session.connect();
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("hello/world/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("control/*"));  // to receive "quit" commands
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(topicPrefix+"/>"));
+        //session.addSubscription(JCSMPFactory.onlyInstance().createTopic("control/*"));  // to receive "quit" commands
         consumer.start();
         final AtomicInteger msgSeqNum = new AtomicInteger();
 
@@ -109,16 +114,16 @@ public class HelloWorldPubSub {
                     		"Hello World!!!",LocalDateTime.now(),topicLevel3,msgSeqNum.get());
                     message.setData(payloadText.getBytes(Charset.forName("UTF-8")));
                     Topic t = JCSMPFactory.onlyInstance().createTopic(
-                            String.format("hello/world/%s/%d",topicLevel3,msgSeqNum.get()));
+                            String.format("%s/%s/%d",topicPrefix,topicLevel3,msgSeqNum.get()));
                     System.out.printf(">>> Calling send() for #%d on %s%n",msgSeqNum.get(),t.getName());
                     producer.send(message,t);
                     message.reset();  // reuse this message on the next loop, to avoid having to recreate it
                     Thread.sleep(5000);
                 }
             } catch (JCSMPException e) {
-                System.out.printf("### %d publisherRunnable publish() exception: %s%n",System.currentTimeMillis(),e);
+                System.out.printf("### publisherRunnable publish() exception: %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    shutdownLatch.countDown();
+                    shutdownGate.countDown();
                 }
             } catch (InterruptedException e) {
                 // IGNORE... probably getting shut down
@@ -130,28 +135,10 @@ public class HelloWorldPubSub {
         publisherThread.setDaemon(true);
         publisherThread.start();
         
-        Runnable systemInputRunnable = () -> {
-        	try {
-				System.in.read();
-                shutdownLatch.countDown();
-			} catch (IOException e1) {
-				// ignore
-			}
-        };
-        Thread inputThread = new Thread(systemInputRunnable);
-        inputThread.setDaemon(true);
-        inputThread.start();
-        
         System.out.println("Connected, and running.");
-        shutdownLatch.await();
-
-        System.out.println("Main thread quitting in 2 seconds.");
-        consumer.close();
-        producer.close();
-        Thread.sleep(2000);  // not really necessary
-        System.out.println("Closing session...");
-        session.closeSession();
-        Thread.sleep(500);
-        System.out.println("Exiting.");
+        shutdownGate.await();
+        System.out.println("Main thread quitting.");
+        session.closeSession();  // quit right away
+        Thread.sleep(5000);
     }
 }
