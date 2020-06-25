@@ -1,1 +1,5 @@
-# solace-samples-java-perf
+# solace-samples-java-new
+
+
+
+HelloWorldPubSub is new
