@@ -50,9 +50,10 @@ public class HelloWorldPubSub {
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
 			@Override
 			public void handleEvent(SessionEventArgs event) {
-                System.out.printf("))) %d Session Event: %s%n",System.currentTimeMillis(),event.getEvent());
+                System.out.printf("))) Session Event: %s%n",event.getEvent());
 			}
 		});
+        
         System.out.print("Enter your name or a unique word: ");
         topicLevel3 = new BufferedReader(new InputStreamReader(System.in)).readLine().replaceAll(" ", "_");
 
@@ -94,7 +95,7 @@ public class HelloWorldPubSub {
         // NOW START APPLICATION /////////////////////////////////////////////////////////////////////////////////////////////////
         session.connect();
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic("hello/world/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("request/hello"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("control/*"));  // to receive "quit" commands
         consumer.start();
         final AtomicInteger msgSeqNum = new AtomicInteger();
 
@@ -111,7 +112,6 @@ public class HelloWorldPubSub {
                             String.format("hello/world/%s/%d",topicLevel3,msgSeqNum.get()));
                     System.out.printf(">>> Calling send() for #%d on %s%n",msgSeqNum.get(),t.getName());
                     producer.send(message,t);
-                    System.out.println("<<< send() done");
                     message.reset();  // reuse this message on the next loop, to avoid having to recreate it
                     Thread.sleep(5000);
                 }
@@ -129,19 +129,27 @@ public class HelloWorldPubSub {
         Thread publisherThread = new Thread(publisherRunnable,"Publisher Thread");
         publisherThread.setDaemon(true);
         publisherThread.start();
-//        topicSuffix = "b";
         
-        System.out.println("Connected, and running. Press [ENTER] to quit.");
-//        System.in.read();  // wait for user to end
+        Runnable systemInputRunnable = () -> {
+        	try {
+				System.in.read();
+                shutdownLatch.countDown();
+			} catch (IOException e1) {
+				// ignore
+			}
+        };
+        Thread inputThread = new Thread(systemInputRunnable);
+        inputThread.setDaemon(true);
+        inputThread.start();
         
+        System.out.println("Connected, and running.");
         shutdownLatch.await();
-        
-        System.out.println("Main thread quitting in 5 seconds.");
-        Thread.sleep(5000);
-        // Close consumer
-        System.out.println("Closing session...");
+
+        System.out.println("Main thread quitting in 2 seconds.");
         consumer.close();
         producer.close();
+        Thread.sleep(2000);  // not really necessary
+        System.out.println("Closing session...");
         session.closeSession();
         Thread.sleep(500);
         System.out.println("Exiting.");
