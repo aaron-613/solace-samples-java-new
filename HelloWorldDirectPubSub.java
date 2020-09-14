@@ -25,7 +25,6 @@ import java.time.LocalDateTime;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -34,6 +33,7 @@ import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
+import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
@@ -47,8 +47,8 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 public class HelloWorldDirectPubSub {
     
     private static volatile boolean shutdownFlag = false;      // are we done?
-    private static final String TOPIC_PREFIX = "world/hello";  // used as the topic "root"
-    private static String usersName = "default";               // change this later
+    private static final String TOPIC_PREFIX = "hello/world";  // used as the topic "root"
+    private static String uniqueName = "default";              // change this later
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
@@ -74,7 +74,7 @@ public class HelloWorldDirectPubSub {
         // User prompt, to use for specific topic
         System.out.print("Enter your name or a unique word: ");
         Scanner userInputScanner = new Scanner(System.in);
-       	usersName = userInputScanner.next().trim().replaceAll("\\s+", "_");  // clean up whitespace
+       	uniqueName = userInputScanner.next().trim().replaceAll("\\s+", "_");  // clean up whitespace
        	userInputScanner.close();
         
         // Producer callbacks config: simple anonymous inner-class for handling publishing events
@@ -113,22 +113,22 @@ public class HelloWorldDirectPubSub {
         });
         
         // Ready to start the application
-        session.connect();
+        session.connect();  // connect to the broker
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic("control/*"));  // to receive "quit" commands
         consumer.start();  // turn on the subs, and start receiving data
 
         final AtomicInteger msgSeqNum = new AtomicInteger();
-        BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+        TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (!shutdownFlag) {  // time to loop!
             try {
             	// make an "interesting" payload
                 String payloadText = String.format("message='%s'; time='%s'; sender='%s'; seq=%d",
-                        "Hello World!", LocalDateTime.now(), usersName, msgSeqNum.incrementAndGet());
-                message.setData(payloadText.getBytes(Charset.forName("UTF-8")));
+                        "Hello World!", LocalDateTime.now(), uniqueName, msgSeqNum.incrementAndGet());
+                message.setText(payloadText);//.getBytes(Charset.forName("UTF-8")));
                 message.setSequenceNumber(msgSeqNum.get());
                 Topic topic = JCSMPFactory.onlyInstance().createTopic(
-                        String.format("%s/%s/%d",TOPIC_PREFIX,usersName,msgSeqNum.get()));
+                        String.format("%s/%s/%d",TOPIC_PREFIX,uniqueName,msgSeqNum.get()));
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum.get(),topic.getName());
                 producer.send(message,topic);
                 message.reset();  // reuse this message on the next loop, to avoid having to recreate it

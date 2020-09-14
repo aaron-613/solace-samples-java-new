@@ -19,6 +19,9 @@
 
 package com.solace.samples.aaron;
 
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -94,7 +97,7 @@ public class FastDirectPublisher {
         });
 
         session.connect();
-
+        
         Runnable pubThread = new Runnable() {
             @Override
             public void run() {
