@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples.aaron.basics;
+package com.solace.samples;
 
 import java.io.IOException;
 
@@ -33,16 +33,16 @@ import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
-public class BasicReplier {
+public class GuaranteedReplier {
 
     public void run(String... args) throws JCSMPException {
-        System.out.println("BasicReplier initializing...");
+        System.out.println("DirectReplier initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.USERNAME, args[1].split("@")[0]); // client-username
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1].split("@")[1]); // message-vpn
-        if (args.length > 2) {
-            properties.setProperty(JCSMPProperties.PASSWORD, args[2]); // client-password
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
+        if (args.length > 3) {
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
@@ -122,23 +122,13 @@ public class BasicReplier {
     public static void main(String... args) throws JCSMPException {
 
         // Check command line arguments
-        if (args.length < 2 || args[1].split("@").length != 2) {
-            System.out.println("Usage: BasicReplier <host:port> <client-username@message-vpn> [client-password]");
-            System.out.println();
-            System.exit(-1);
-        }
-        if (args[1].split("@")[0].isEmpty()) {
-            System.out.println("No client-username entered");
-            System.out.println();
-            System.exit(-1);
-        }
-        if (args[1].split("@")[1].isEmpty()) {
-            System.out.println("No message-vpn entered");
+        if (args.length < 3) {
+            System.out.println("Usage: BasicReplier <host:port> <message-vpn> <client-username> [client-password]");
             System.out.println();
             System.exit(-1);
         }
 
-        BasicReplier replier = new BasicReplier();
+        GuaranteedReplier replier = new GuaranteedReplier();
         replier.run(args);
     }
 }

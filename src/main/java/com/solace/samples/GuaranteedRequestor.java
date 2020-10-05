@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples.aaron.basics;
+package com.solace.samples;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -25,7 +25,7 @@ import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPRequestTimeoutException;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.Requestor;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.Topic;
@@ -33,35 +33,25 @@ import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
-public class BasicRequestor {
+public class GuaranteedRequestor {
 
     public static void main(String... args) throws JCSMPException {
         // Check command line arguments
-        if (args.length < 2 || args[1].split("@").length != 2) {
-            System.out.println("Usage: BasicRequestor <host:port> <client-username@message-vpn> [client-password]");
-            System.out.println();
-            System.exit(-1);
-        }
-        if (args[1].split("@")[0].isEmpty()) {
-            System.out.println("No client-username entered");
-            System.out.println();
-            System.exit(-1);
-        }
-        if (args[1].split("@")[1].isEmpty()) {
-            System.out.println("No message-vpn entered");
+        if (args.length < 3) {
+            System.out.println("Usage: DirectRequestor <host:port> <message-vpn> <client-username> [client-password]");
             System.out.println();
             System.exit(-1);
         }
 
-        System.out.println("BasicRequestor initializing...");
+        System.out.println("DirectRequestor initializing...");
 
         // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.USERNAME, args[1].split("@")[0]); // client-username
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1].split("@")[1]); // message-vpn
-        if (args.length > 2) {
-            properties.setProperty(JCSMPProperties.PASSWORD, args[2]); // client-password
+        properties.setProperty(JCSMPProperties.USERNAME, args[1]); // client-username
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[21]); // message-vpn
+        if (args.length > 3) {
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
         final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
@@ -71,15 +61,23 @@ public class BasicRequestor {
 
         /** Anonymous inner-class for handling publishing events */
         @SuppressWarnings("unused")
-        XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
+        XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override
             public void responseReceived(String messageID) {
-                System.out.println("Producer received response for msg: " + messageID);
+                // unused, deprecated and superseded
             }
             @Override
             public void handleError(String messageID, JCSMPException e, long timestamp) {
+                // unused, deprecated and superseded
+            }
+            @Override
+            public void responseReceivedEx(Object key) {
+                System.out.println("Producer received response for msg: " + key);
+            }
+            @Override
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("Producer received error for msg: %s@%s - %s%n",
-                        messageID,timestamp,e);
+                        key,timestamp,cause);                
             }
         });
 
