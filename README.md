@@ -5,10 +5,15 @@ These few samples are the starting point of the proposed way of presenting Solac
 
 ## Basics
 
- - HelloWorld Direct Pub/Sub
- - Publish-Subscribe, both Direct and Guaranteed
- - Request-Reply, both Direct and Guaranteed
-
+ - HelloWorld (Direct) Pub/Sub
+ - Direct
+    - Publish-Subscribe
+    - Processor
+    - Request-Reply
+ - Guaranteed
+    - Publish-Subscribe
+    - Processor
+    - Request-Reply
 
 
 ## The Features
@@ -17,7 +22,7 @@ These few samples are the starting point of the proposed way of presenting Solac
  - Active Flow Consumer Indication
  - Time-To-Live Message Expiry, and Dead Message Queues
  - Last Value Queues
- - Dynamically created Queues
+ - Dynamically created/provision Queues
 
 
 ## The Extras
