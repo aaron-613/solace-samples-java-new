@@ -1,4 +1,4 @@
-# solace-samples-java-new
+# solace-samples-jcsmp
 
 These few samples are the starting point of the proposed way of presenting Solace samples.
 
