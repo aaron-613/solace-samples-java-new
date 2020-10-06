@@ -38,8 +38,8 @@ public class DirectRequestor {
     public static void main(String... args) throws JCSMPException {
         // Check command line arguments
         if (args.length < 3) {
-            System.out.println("Usage: DirectRequestor <host:port> <message-vpn> <client-username> [client-password]");
-            System.out.println();
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    DirectRequestor.class.getSimpleName());
             System.exit(-1);
         }
 

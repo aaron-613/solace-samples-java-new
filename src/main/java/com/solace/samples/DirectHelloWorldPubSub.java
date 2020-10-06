@@ -49,11 +49,10 @@ public class DirectHelloWorldPubSub {
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: DirectHelloWorldPubSub <host:port> <message-vpn>" +
-                    " <client-username> [client-password]%n%n");
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    DirectHelloWorldPubSub.class.getSimpleName());
             System.exit(-1);
         }
-        System.out.println("HelloWorldDirectPubSub initializing...");
         // Build the properties object for initializing the Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);
@@ -119,18 +118,18 @@ public class DirectHelloWorldPubSub {
         session.connect();  // connect to the broker
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));
         consumer.start();  // turn on the subs, and start receiving data
+        System.out.println("Connected and subscribed. Ready to publish.");
 
-        final AtomicInteger msgSeqNum = new AtomicInteger();
+        final AtomicInteger msgSeqNum = new AtomicInteger(0);
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (!shutdownFlag) {  // time to loop!
             try {
-            	// make an "interesting" payload
-                String payloadText = String.format("{\"message\"='%s'; sender='%s'; seq=%d",
-                        "Hello World!", uniqueName, msgSeqNum.incrementAndGet());
-                message.setText(payloadText);//.getBytes(Charset.forName("UTF-8")));
-                message.setSequenceNumber(msgSeqNum.get());
-                // make an "interesting" topic as well: hello/world/aaron/123
+                msgSeqNum.incrementAndGet();
+            	// specify a text payload
+                message.setText(String.format("Hello World %d from %s!", msgSeqNum.get(),uniqueName));
+                // make a dynamic topic: hello/world/[uniqueName]/123
                 String topicString = String.format("%s/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum.get());
+                
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum.get(),topicString);
                 producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();  // reuse this message on the next loop, to avoid having to recreate it

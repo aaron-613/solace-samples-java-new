@@ -47,10 +47,6 @@ public class DirectProcessor {
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
 
-        final Topic topic = JCSMPFactory.onlyInstance().createTopic("GET/>");
-        final Topic topic2 = JCSMPFactory.onlyInstance().createTopic("POST/>");
-        
-
         /** Anonymous inner-class for handling publishing events */
         final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
             @Override
@@ -99,12 +95,12 @@ public class DirectProcessor {
             }
         });
 
-        session.addSubscription(topic);
-        session.addSubscription(topic2);
+        Topic topic1 = JCSMPFactory.onlyInstance().createTopic("solace/direct/test/*");
+        session.addSubscription(topic1);
         cons.start();
 
         // Consume-only session is now hooked up and running!
-        System.out.println("Listening for request messages on topic " + topic + " ... Press enter to exit");
+        System.out.println("Listening for request messages on topic " + topic1 + " ... Press enter to exit");
         try {
             System.in.read();
         } catch (IOException e) {
@@ -122,8 +118,8 @@ public class DirectProcessor {
 
         // Check command line arguments
         if (args.length < 3) {
-            System.out.println("Usage: DirectProcessor <host:port> <message-vpn> <client-username> [client-password]");
-            System.out.println();
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    DirectProcessor.class.getSimpleName());
             System.exit(-1);
         }
 

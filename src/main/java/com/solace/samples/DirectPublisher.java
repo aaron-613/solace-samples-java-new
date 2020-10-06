@@ -29,22 +29,22 @@ import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProducerEventHandler;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.ProducerEventArgs;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectPublisher {
     
-    static final int MSG_RATE = 5;  // Note: Standard edition PubSub+ broker is limited to 10k max ingress
-    static final int PAYLOAD_SIZE = 256;
+    static int MSG_RATE = 5;  // Note: Standard edition PubSub+ broker is limited to 10k max ingress
+    static int PAYLOAD_SIZE = 256;
     static volatile boolean shutdown = false;
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         // Check command line arguments
         if (args.length < 3) {
-            System.out.println("Usage: "+DirectPublisher.class.getSimpleName()+" <host:port> <message-vpn> <client-username> [client-password]");
-            System.out.println();
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    DirectPublisher.class.getSimpleName());
             System.exit(-1);
         }
 
@@ -66,13 +66,21 @@ public class DirectPublisher {
         final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
 
         /** Anonymous inner-class for handling publishing events */
-        XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
+        XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override
             public void responseReceived(String messageID) {
-                // DIRECT publishers don't get publish callbacks
+                // deprecated, superseded by responseReceivedEx()
             }
             @Override
             public void handleError(String messageID, JCSMPException e, long timestamp) {
+                // deprecated, superseded by handleErrorEx()
+            }
+            @Override
+            public void responseReceivedEx(Object key) {
+                // DIRECT publishers don't get publish callbacks
+            }
+            @Override
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 // DIRECT publishers don't get publish callbacks
             }
         }, new JCSMPProducerEventHandler() {
@@ -89,7 +97,8 @@ public class DirectPublisher {
             @Override
             public void run() {
                 final int APPROX_NANOS_BETWEEN_MSGS = (1_000_000_000 / MSG_RATE);  // won't be exactly the message rate, but close
-                Topic topic; // = JCSMPFactory.onlyInstance().createTopic("aaron/test/topic");
+                String topicString;
+                //Topic topic;
                 BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
                 byte[] payload = new byte[PAYLOAD_SIZE];
                 long curNanoTime = System.nanoTime();  // grab the current time before the start of the loop
@@ -99,16 +108,19 @@ public class DirectPublisher {
                         characterOfTheMoment = (char)((curNanoTime%26)+65);
                         Arrays.fill(payload,(byte)characterOfTheMoment);  // fill it with some "random" value
                         message.setData(payload);
-                        //message.setSequenceNumber(37373773);
                         // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
-                        topic = JCSMPFactory.onlyInstance().createTopic(new StringBuilder("aaron/test/").append(characterOfTheMoment).toString());
-                        prod.send(message,topic);
+                        topicString = new StringBuilder("solace/direct/test/").append(characterOfTheMoment).toString();
+                        prod.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
                         message.reset();  // reuse this message on the next loop, to avoid having to recreate it
-
-                        while (System.nanoTime() < (curNanoTime + APPROX_NANOS_BETWEEN_MSGS)) { /* SPIN HARD */ }
-                            // BUSY WAIT!  (instead of Thread.sleep)
-                            // burns more CPU, but provides more accurate publish rate
-                            // comment out the "while" statement to publish as fast as possible
+                        try {
+                            if (APPROX_NANOS_BETWEEN_MSGS >= 1_000_000) {  // i.e. more than 1 ms
+                                Thread.sleep(APPROX_NANOS_BETWEEN_MSGS / 1_000_000);
+                            } else {
+                                Thread.sleep(0,APPROX_NANOS_BETWEEN_MSGS);
+                            }
+                        } catch (InterruptedException e) {
+                            shutdown = true;
+                        }
                         curNanoTime = System.nanoTime();
                     }
                 } catch (JCSMPException e) {

@@ -123,8 +123,8 @@ public class DirectReplier {
 
         // Check command line arguments
         if (args.length < 3) {
-            System.out.println("Usage: BasicReplier <host:port> <message-vpn> <client-username> [client-password]");
-            System.out.println();
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    DirectReplier.class.getSimpleName());
             System.exit(-1);
         }
 

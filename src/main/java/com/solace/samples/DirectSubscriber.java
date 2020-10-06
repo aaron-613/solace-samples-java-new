@@ -30,22 +30,22 @@ import com.solacesystems.jcsmp.JCSMPGlobalProperties;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPTransportException;
-import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 
 public class DirectSubscriber {
 
+    private static final boolean VERIFY_PAYLOAD_DATA = true;
+
     private static volatile int msgCounter = 0;
     private static volatile boolean discardFlag = false;
-    private static volatile boolean doSomeSillyVerifyingOfData = true;
     private static volatile boolean shutdown = false;
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         // Check command line arguments
         if (args.length < 3) {
-            System.out.println("Usage: "+DirectSubscriber.class.getSimpleName()+" <host:port> <message-vpn> <client-username> [client-password]");
-            System.out.println();
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    DirectSubscriber.class.getSimpleName());
             System.exit(-1);
         }
 
@@ -61,8 +61,7 @@ public class DirectSubscriber {
         cp.setTcpNoDelay(false);  // high throughput magic sauce... but will hurt latencies a bit
         //cp.setCompressionLevel(9);
         cp.setReconnectRetries(0);
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,cp);
-        //properties.setProperty(JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR,true);  // use only 1 thread instead of 2, but hurts throughput 
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, cp);
         {  // this next block is probably unnecessary until receiving > 100k msg/s, so delete if going slower than that
             JCSMPGlobalProperties gp = new JCSMPGlobalProperties();
             gp.setConsumerDefaultFlowCongestionLimit(20000);  // override default (5000)
@@ -88,7 +87,7 @@ public class DirectSubscriber {
                 }
                 System.out.println(msg.getSequenceNumber());
                 // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
-                if (doSomeSillyVerifyingOfData) {
+                if (VERIFY_PAYLOAD_DATA) {
                     // as set in the publisher code, the payload should be filled with the same character as the last letter of the topic
                     BytesMessage message = (BytesMessage)msg;
                     if (message.getAttachmentContentLength() > 0) {
@@ -97,7 +96,7 @@ public class DirectSubscriber {
                         char lastTopicChar = message.getDestination().getName().charAt(message.getDestination().getName().length()-1);
                         if (payloadChar != lastTopicChar) {
                             System.out.println("*** Topic vs. Payload discrepancy *** : didn't match! oh well!");
-                            doSomeSillyVerifyingOfData = false;  // don't do any further testing
+                            //VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
                         }
                     }
                 }
@@ -106,7 +105,7 @@ public class DirectSubscriber {
             @Override
             public void onException(JCSMPException e) {
                 // uh oh!
-                System.err.println("### We've had an exception thrown to the Consumer's onException()");
+                System.err.println("### Exception thrown to the Consumer's onException()");
                 e.printStackTrace();
                 if (e instanceof JCSMPTransportException) {  // pretty bad, not recoverable
                 	// means that all the reconnection attempts have failed
@@ -116,8 +115,8 @@ public class DirectSubscriber {
         });
 
         session.connect();
-        final Topic topic = JCSMPFactory.onlyInstance().createTopic("aaron/>");
-        session.addSubscription(topic);
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("solace/direct/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("solace/control/>"));
         cons.start();
 
         Runnable statsRunnable = new Runnable() {
@@ -127,10 +126,10 @@ public class DirectSubscriber {
                     while (!shutdown) {
                         Thread.sleep(1000);  // wait 1 second
                         System.out.printf("Msgs/s: %,d%n",msgCounter);
-                        // kinda hacky way of doing message rates, but doesn't matter too much
+                        // simple way of calculating message rates
                         msgCounter = 0;
                         if (discardFlag) {
-                            System.out.println("*** Egress discard detected *** : consumer unable to keep up with full message rate");
+                            System.out.println("*** Egress discard detected *** : Direct Subscriber unable to keep up with full message rate");
                             discardFlag = false;  // only show the error once per second
                         }
                     }
@@ -147,7 +146,6 @@ public class DirectSubscriber {
         System.in.read();  // wait for user to end
         System.out.println("Quitting in 1 second.");
         shutdown = true;
-        session.removeSubscription(topic);
         Thread.sleep(1000);
         // Close consumer
         cons.close();
