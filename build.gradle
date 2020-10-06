@@ -1,7 +1,14 @@
-apply plugin: 'java'
-apply plugin: 'eclipse'
-apply plugin: 'idea'
-apply plugin: 'application'
+plugins {
+    // Apply the java plugin to add support for Java
+    id 'java'
+
+    // Apply the application plugin to add support for building a CLI application.
+    id 'application'
+
+    id 'idea'
+    id 'eclipse'
+}
+
 
 // Don't need these task, so disabling them. Makes it possible to avoid
 // declaring a single application main class.
@@ -32,11 +39,11 @@ eclipse {
         downloadJavadoc = true
         downloadSources = true
     }
-  jdt {
-    //if you want to alter the java versions (by default they are configured with gradle java plugin settings):
-    sourceCompatibility = 1.8
-    targetCompatibility = 1.8
-  }
+    jdt {
+        //if you want to alter the java versions (by default they are configured with gradle java plugin settings):
+        sourceCompatibility = 1.8
+        targetCompatibility = 1.8
+    }
 }
 
 idea {
@@ -65,10 +72,10 @@ dependencies {
 //}
 
 tasks.withType(JavaCompile).all {
-  options.compilerArgs.add("-Xlint:all")
+    options.compilerArgs.add("-Xlint:all")
 }
 
-  def scripts = ['DirectHelloWorldPubSub':'com.solace.samples.DirectHelloWorldPubSub',
+def scripts = ['DirectHelloWorldPubSub':'com.solace.samples.DirectHelloWorldPubSub',
 'DirectProcessor':'com.solace.samples.DirectProcessor',
 'DirectPublisher':'com.solace.samples.DirectPublisher',
 'DirectReplier':'com.solace.samples.DirectReplier',
@@ -88,17 +95,17 @@ tasks.withType(JavaCompile).all {
                  'featureTransactions':'com.solace.samples.features.Transactions',
                  'featureMessageReplay':'com.solace.samples.features.MessageReplay'
 ]
-  scripts.each() { scriptName, className ->
-          def t = tasks.create(name: scriptName+'StartScript', type: CreateStartScripts) {
+scripts.each() { scriptName, className ->
+    def t = tasks.create(name: scriptName+'StartScript', type: CreateStartScripts) {
         mainClassName = className
         applicationName = scriptName
         outputDir = new File(project.buildDir, 'scripts')
         classpath = jar.outputs.files + project.configurations.runtime
     }
-      applicationDistribution.into("bin") {
-            from(t)
-            fileMode = 0755
-			duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    applicationDistribution.into("bin") {
+        from(t)
+        fileMode = 0755
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     }
     //createAllStartScripts.dependsOn(t)
 }

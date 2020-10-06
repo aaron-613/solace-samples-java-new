@@ -76,10 +76,12 @@ public class DirectHelloWorldPubSub {
         
         // Producer callbacks config: simple anonymous inner-class for handling publishing events
         XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-            @Override public void responseReceived(String messageID) {
+            @Override @SuppressWarnings("deprecation")
+            public void responseReceived(String messageID) {
                 // deprecated, superseded by responseReceivedEx()
             }
-            @Override public void handleError(String messageID, JCSMPException e, long timestamp) {
+            @Override @SuppressWarnings("deprecation")
+            public void handleError(String messageID, JCSMPException e, long timestamp) {
                 // deprecated, superseded by handleErrorEx()
             }
             @Override public void responseReceivedEx(Object key) {
