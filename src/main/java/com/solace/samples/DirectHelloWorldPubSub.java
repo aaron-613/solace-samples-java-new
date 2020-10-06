@@ -40,14 +40,12 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 /**
  * This simple introductory sample shows an application that both publishes and subscribes.
- * It includes some basic Solace "best practices", but for more substantial examples of Solace
- * applications, please refer to the other samples in this folder.
  */
 public class DirectHelloWorldPubSub {
     
-    private static volatile boolean shutdownFlag = false;      // are we done?
+    private static volatile boolean shutdownFlag = false;      // done yet?
     private static final String TOPIC_PREFIX = "hello/world";  // used as the topic "root"
-    private static String uniqueName = "default";              // change this later
+    private static String uniqueName = "default";              // change this later from user
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
@@ -56,7 +54,7 @@ public class DirectHelloWorldPubSub {
             System.exit(-1);
         }
         System.out.println("HelloWorldDirectPubSub initializing...");
-        // Build the properties object(s) for initializing the Session
+        // Build the properties object for initializing the Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);
@@ -64,7 +62,7 @@ public class DirectHelloWorldPubSub {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);
         }
-        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(10);  // give more time for an HA failover
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
@@ -78,11 +76,15 @@ public class DirectHelloWorldPubSub {
         
         // Producer callbacks config: simple anonymous inner-class for handling publishing events
         XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-            // these first 2 are never called, they have been replaced by the "Ex" versions
-            @Override public void responseReceived(String messageID) { }
-            @Override public void handleError(String messageID, JCSMPException e, long timestamp) { }
-            // next one only used in Guaranteed/Persistent publishing application
-            @Override public void responseReceivedEx(Object key) { }
+            @Override public void responseReceived(String messageID) {
+                // deprecated, superseded by responseReceivedEx()
+            }
+            @Override public void handleError(String messageID, JCSMPException e, long timestamp) {
+                // deprecated, superseded by handleErrorEx()
+            }
+            @Override public void responseReceivedEx(Object key) {
+                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
+            }
             // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
             public void handleErrorEx(Object key, JCSMPException e, long timestamp) {
@@ -99,11 +101,11 @@ public class DirectHelloWorldPubSub {
             public void onReceive(BytesXMLMessage msg) {
                 // could be 4 different message types: 3 SMF ones (Text, Map, Stream) and just plain binary
                 System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());
-                if (msg.getDestination().getName().equals("control/quit")) shutdownFlag = true;
+                if (msg.getDestination().getName().equals(TOPIC_PREFIX+"/quit")) shutdownFlag = true;
             }
 
             @Override
-            public void onException(JCSMPException e) {  // uh oh!
+            public void onException(JCSMPException e) {  // oh no!
                 System.out.printf("### MessageListener's onException(): %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable
                     shutdownFlag = true;
@@ -114,7 +116,6 @@ public class DirectHelloWorldPubSub {
         // Ready to start the application
         session.connect();  // connect to the broker
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("control/*"));  // to receive "quit" commands
         consumer.start();  // turn on the subs, and start receiving data
 
         final AtomicInteger msgSeqNum = new AtomicInteger();
@@ -122,18 +123,18 @@ public class DirectHelloWorldPubSub {
         while (!shutdownFlag) {  // time to loop!
             try {
             	// make an "interesting" payload
-                String payloadText = String.format("message='%s'; time='%s'; sender='%s'; seq=%d",
-                        "Hello World!", LocalDateTime.now(), uniqueName, msgSeqNum.incrementAndGet());
+                String payloadText = String.format("{\"message\"='%s'; sender='%s'; seq=%d",
+                        "Hello World!", uniqueName, msgSeqNum.incrementAndGet());
                 message.setText(payloadText);//.getBytes(Charset.forName("UTF-8")));
                 message.setSequenceNumber(msgSeqNum.get());
-                Topic topic = JCSMPFactory.onlyInstance().createTopic(
-                        String.format("%s/%s/%d",TOPIC_PREFIX,uniqueName,msgSeqNum.get()));
-                System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum.get(),topic.getName());
-                producer.send(message,topic);
+                // make an "interesting" topic as well: hello/world/aaron/123
+                String topicString = String.format("%s/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum.get());
+                System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum.get(),topicString);
+                producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();  // reuse this message on the next loop, to avoid having to recreate it
                 Thread.sleep(5000);  // take a pause
 	        } catch (JCSMPException e) {
-	            System.out.printf("### publisherRunnable publish() exception: %s%n",e);
+	            System.out.printf("### Exception caught during publish(): %s%n",e);
 	            if (e instanceof JCSMPTransportException) {  // unrecoverable
 	                shutdownFlag = true;
 	            }
