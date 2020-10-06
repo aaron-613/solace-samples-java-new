@@ -15,14 +15,14 @@ distTar.enabled=false
 distZip.enabled=false
 
 applicationName = 'solace-samples-jcsmp'
-version = ''
+//version = ''
 
 jar {
-    baseName = 'solace-samples-jcsmp'
-    version =  version
+    archiveBaseName = 'solace-samples-jcsmp'
+    archiveVersion = ''
     manifest {
         attributes 'Implementation-Title': 'Solace JCSMP Getting Started Samples',
-                   'Implementation-Version': version
+                   'Implementation-Version': ''
     }
 }
 
