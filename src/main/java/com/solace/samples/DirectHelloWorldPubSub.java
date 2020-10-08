@@ -20,7 +20,6 @@
 package com.solace.samples;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.Scanner;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -29,11 +28,11 @@ import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
+import com.solacesystems.jcsmp.JCSMPReconnectEventHandler;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.TextMessage;
-import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
@@ -44,7 +43,7 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 public class DirectHelloWorldPubSub {
     
     private static volatile boolean shutdownFlag = false;      // done yet?
-    private static final String TOPIC_PREFIX = "hello/world";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "samples/hello";  // used as the topic "root"
     private static String uniqueName = "default";              // change this later from user
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
@@ -63,8 +62,7 @@ public class DirectHelloWorldPubSub {
         }
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
-        channelProps.setReconnectRetries(20);  // give more time for an HA failover
-        channelProps.setConnectRetriesPerHost(5);  // recommended in docs
+        channelProps.setReconnectRetries(10);  // give more time to reconnect
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         
@@ -121,17 +119,17 @@ public class DirectHelloWorldPubSub {
         consumer.start();  // turn on the subs, and start receiving data
         System.out.println("Connected and subscribed. Ready to publish.");
 
-        final AtomicInteger msgSeqNum = new AtomicInteger(0);
+        int msgSeqNum = 0;
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (!shutdownFlag) {  // time to loop!
             try {
-                msgSeqNum.incrementAndGet();
+                msgSeqNum++;
             	// specify a text payload
-                message.setText(String.format("Hello World %d from %s!", msgSeqNum.get(),uniqueName));
+                message.setText(String.format("Hello World %d from %s!", msgSeqNum,uniqueName));
                 // make a dynamic topic: hello/world/[uniqueName]/123
-                String topicString = String.format("%s/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum.get());
+                String topicString = String.format("%s/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum);
                 
-                System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum.get(),topicString);
+                System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum,topicString);
                 producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();  // reuse this message on the next loop, to avoid having to recreate it
                 Thread.sleep(5000);  // take a pause

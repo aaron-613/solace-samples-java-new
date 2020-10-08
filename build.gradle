@@ -1,10 +1,6 @@
 plugins {
-    // Apply the java plugin to add support for Java
     id 'java'
-
-    // Apply the application plugin to add support for building a CLI application.
     id 'application'
-
     id 'idea'
     id 'eclipse'
 }
@@ -63,7 +59,6 @@ dependencies {
     implementation group: 'com.solacesystems', name: 'sol-jcsmp', version: '10.9.0'
     // JSON API dependency
     testImplementation group: 'org.glassfish', name: 'javax.json', version: '1.1.4'
-
 }
 
 // unused, so commenting out (Issue #58)
@@ -76,24 +71,23 @@ tasks.withType(JavaCompile).all {
 }
 
 def scripts = ['DirectHelloWorldPubSub':'com.solace.samples.DirectHelloWorldPubSub',
-'DirectProcessor':'com.solace.samples.DirectProcessor',
-'DirectPublisher':'com.solace.samples.DirectPublisher',
-'DirectReplier':'com.solace.samples.DirectReplier',
-'DirectRequestor':'com.solace.samples.DirectRequestor',
-'DirectSubscriber':'com.solace.samples.DirectSubscriber',
-'GuaranteedProcessor':'com.solace.samples.GuaranteedProcessor',
-'GuaranteedPublisher':'com.solace.samples.GuaranteedPublisher',
-'GuaranteedReplier':'com.solace.samples.GuaranteedReplier',
-'GuaranteedRequestor':'com.solace.samples.GuaranteedRequestor',
-'GuaranteedSubscriber':'com.solace.samples.GuaranteedSubscriber',
-'TransactedProcessor':'com.solace.samples.TransactedProcessor',
-
-                 'featureMessageSelectorsOnQueue':'com.solace.samples.features.MessageSelectorsOnQueue',
-                 'featureMessageTTLAndDeadMessageQueue':'com.solace.samples.features.MessageTTLAndDeadMessageQueue',
-                 'featureQueueProvisionAndBrowse':'com.solace.samples.features.QueueProvisionAndBrowse',
-                 'featureQueueProvisionAndRequestActiveFlowIndication':'com.solace.samples.features.QueueProvisionAndRequestActiveFlowIndication',
-                 'featureTransactions':'com.solace.samples.features.Transactions',
-                 'featureMessageReplay':'com.solace.samples.features.MessageReplay'
+    'DirectProcessor':'com.solace.samples.DirectProcessor',
+    'DirectPublisher':'com.solace.samples.DirectPublisher',
+    'DirectReplier':'com.solace.samples.DirectReplier',
+    'DirectRequestor':'com.solace.samples.DirectRequestor',
+    'DirectSubscriber':'com.solace.samples.DirectSubscriber',
+    'GuaranteedProcessor':'com.solace.samples.GuaranteedProcessor',
+    'GuaranteedPublisher':'com.solace.samples.GuaranteedPublisher',
+    'GuaranteedReplier':'com.solace.samples.GuaranteedReplier',
+    'GuaranteedRequestor':'com.solace.samples.GuaranteedRequestor',
+    'GuaranteedSubscriber':'com.solace.samples.GuaranteedSubscriber',
+    'TransactedProcessor':'com.solace.samples.TransactedProcessor',
+    'featureMessageSelectorsOnQueue':'com.solace.samples.features.MessageSelectorsOnQueue',
+    'featureMessageTTLAndDeadMessageQueue':'com.solace.samples.features.MessageTTLAndDeadMessageQueue',
+    'featureQueueProvisionAndBrowse':'com.solace.samples.features.QueueProvisionAndBrowse',
+    'featureQueueProvisionAndRequestActiveFlowIndication':'com.solace.samples.features.QueueProvisionAndRequestActiveFlowIndication',
+    'featureTransactions':'com.solace.samples.features.Transactions',
+    'featureMessageReplay':'com.solace.samples.features.MessageReplay'
 ]
 scripts.each() { scriptName, className ->
     def t = tasks.create(name: scriptName+'StartScript', type: CreateStartScripts) {
