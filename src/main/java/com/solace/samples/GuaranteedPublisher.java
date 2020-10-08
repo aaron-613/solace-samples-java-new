@@ -125,12 +125,12 @@ public class GuaranteedPublisher {
         // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.USERNAME, args[1].split("@")[0]); // client-username
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1].split("@")[1]); // message-vpn
+        properties.setProperty(JCSMPProperties.VPN_NAME, args[1]); // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
         if (args.length > 3) { 
-            properties.setProperty(JCSMPProperties.PASSWORD, args[2]); // client-password
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
-        properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,5);
+        properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,1);
         final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
 
         session.connect();
@@ -210,7 +210,7 @@ public class GuaranteedPublisher {
 			        	prod.send(message,topic);
 			        	System.out.printf("%s  SEND %d END:   %s%n",getTs(),key.id,key);
 			        	
-			        	while (System.nanoTime() < (curNanoTime + (1_000_000_000 / MSG_RATE))) { }
+			        	//while (System.nanoTime() < (curNanoTime + (1_000_000_000 / MSG_RATE))) { }
 			        		// busy wait
 			        }
 		        } catch (JCSMPException e) {

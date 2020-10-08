@@ -63,12 +63,13 @@ public class DirectHelloWorldPubSub {
         }
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
-        channelProps.setReconnectRetries(10);  // give more time for an HA failover
+        channelProps.setReconnectRetries(20);  // give more time for an HA failover
+        channelProps.setConnectRetriesPerHost(5);  // recommended in docs
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         
         // User prompt, to use for specific topic
-        System.out.print("Enter your name or a unique word: ");
+        System.out.print("Enter your name, or a unique word: ");
         Scanner userInputScanner = new Scanner(System.in);
        	uniqueName = userInputScanner.next().trim().replaceAll("\\s+", "_");  // clean up whitespace
        	userInputScanner.close();
