@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples.other;
+package com.solace.samples.others;
 
 import java.nio.charset.Charset;
 import java.util.concurrent.atomic.AtomicInteger;

@@ -21,14 +21,12 @@ package com.solace.samples;
 
 import java.io.IOException;
 import java.util.Scanner;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
-import com.solacesystems.jcsmp.JCSMPReconnectEventHandler;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
@@ -42,9 +40,9 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
  */
 public class DirectHelloWorldPubSub {
     
-    private static volatile boolean shutdownFlag = false;      // done yet?
     private static final String TOPIC_PREFIX = "samples/hello";  // used as the topic "root"
-    private static String uniqueName = "default";              // change this later from user
+    private static volatile boolean isShutdownFlag = false;      // done yet?
+    private static String uniqueName = "Solly";                  // change this later from user
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
@@ -90,7 +88,7 @@ public class DirectHelloWorldPubSub {
             public void handleErrorEx(Object key, JCSMPException e, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    shutdownFlag = true;
+                    isShutdownFlag = true;
                 }
             }
         }, null);  // null is the ProducerEvent handler... don't need it in this simple application
@@ -101,14 +99,14 @@ public class DirectHelloWorldPubSub {
             public void onReceive(BytesXMLMessage msg) {
                 // could be 4 different message types: 3 SMF ones (Text, Map, Stream) and just plain binary
                 System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());
-                if (msg.getDestination().getName().equals(TOPIC_PREFIX+"/quit")) shutdownFlag = true;
+                if (msg.getDestination().getName().equals(TOPIC_PREFIX+"/quit")) isShutdownFlag = true;
             }
 
             @Override
             public void onException(JCSMPException e) {  // oh no!
                 System.out.printf("### MessageListener's onException(): %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    shutdownFlag = true;
+                    isShutdownFlag = true;
                 }
             }
         });
@@ -121,7 +119,7 @@ public class DirectHelloWorldPubSub {
 
         int msgSeqNum = 0;
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        while (!shutdownFlag) {  // time to loop!
+        while (!isShutdownFlag) {  // time to loop!
             try {
                 msgSeqNum++;
             	// specify a text payload
@@ -136,7 +134,7 @@ public class DirectHelloWorldPubSub {
 	        } catch (JCSMPException e) {
 	            System.out.printf("### Exception caught during publish(): %s%n",e);
 	            if (e instanceof JCSMPTransportException) {  // unrecoverable
-	                shutdownFlag = true;
+	                isShutdownFlag = true;
 	            }
 	        } catch (InterruptedException e) {
 	            // IGNORE... probably getting shut down
