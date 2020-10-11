@@ -113,14 +113,14 @@ public class DirectPublisher {
                         // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
                         topicString = new StringBuilder(TOPIC_PREFIX).append("/test/").append(characterOfTheMoment).toString();
                         prod.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
-                        message.reset();  // reuse this message on the next loop, to avoid having to recreate it
-/*                        try {
+                        message.reset();  // reuse this message, to avoid having to recreate it: better performance
+                        try {
                             Thread.sleep(100);  // for approximately 10 msg/s.  comment out for max speed
                             // Note: STANDARD Edition PubSub+ broker is limited to 10k max ingress
                         } catch (InterruptedException e) {
                             isShutdownFlag = true;
                         }
-  */                  }
+                    }
                 } catch (JCSMPException e) {
                     e.printStackTrace();
                 } finally {

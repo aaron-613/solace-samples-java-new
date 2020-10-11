@@ -36,6 +36,8 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectProcessor {
 
+    private static final String TOPIC_PREFIX = "samples/direct";  // used as the topic "root"
+
     public void run(String... args) throws JCSMPException {
         System.out.println(DirectProcessor.class.getSimpleName()+" initializing...");
         
@@ -70,31 +72,22 @@ public class DirectProcessor {
         /** Anonymous inner-class for request handling **/
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
-            public void onReceive(BytesXMLMessage request) {
-
-                if (request.getReplyTo() == null) {  // not expecting reply
-                    System.out.println("Received message, generating processed");
-                    TextMessage reply = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-
-                    final String text = request.dump().toUpperCase();
+            public void onReceive(BytesXMLMessage incoming) {
+                if (incoming.getReplyTo() == null) {  // not expecting reply
+                    TextMessage onwardsMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+                    final String upperCaseMessage = incoming.dump().toUpperCase();
+                    onwardsMsg.setText(upperCaseMessage);
+                    String onwardsTopic = TOPIC_PREFIX+"/proc/"+incoming.getDestination().getName().toUpperCase();
                     try {
-                        reply.setText("Your path was: "+request.getProperties().getString("JMS_Solace_HTTP_target_path_query_verbatim"));
-                    } catch (Exception e) {
-                        reply.setText(text);
-                    }
-                    System.out.println(request.dump());  // prints the request message to the console
-                    reply.setApplicationMessageId(request.getApplicationMessageId());  // needed for correlation
-                    System.out.println(reply.dump());
-                    try {
-                        producer.sendReply(request, reply);
+                        producer.send(onwardsMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                     } catch (JCSMPException e) {
-                        System.out.println("Error sending reply.");
+                        System.out.println("### Error sending reply.");
                         e.printStackTrace();
+
                     }
                 } else {
                     System.out.println("Received message without reply-to field");
                 }
-
             }
 
             public void onException(JCSMPException e) {
@@ -103,12 +96,12 @@ public class DirectProcessor {
         });
 
         session.connect();
-        Topic topic1 = JCSMPFactory.onlyInstance().createTopic("solace/direct/test/*");
+        Topic topic1 = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/test/>");  // listen to 
         session.addSubscription(topic1);
         cons.start();
 
         // Consume-only session is now hooked up and running!
-        System.out.println("Listening for request messages on topic " + topic1 + " ... Press enter to exit");
+        System.out.println("Listening for incoming messages on topic " + topic1 + " ... Press enter to exit");
         try {
             System.in.read();
         } catch (IOException e) {
@@ -129,7 +122,6 @@ public class DirectProcessor {
                     DirectProcessor.class.getSimpleName());
             System.exit(-1);
         }
-
         DirectProcessor processor = new DirectProcessor();
         processor.run(args);
     }
