@@ -41,8 +41,7 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 public class DirectHelloWorldPubSub {
     
     private static final String TOPIC_PREFIX = "samples/hello";  // used as the topic "root"
-    private static volatile boolean isShutdownFlag = false;      // done yet?
-    private static String uniqueName = "Solly";                  // change this later from user
+    private static volatile boolean isShutdownFlag = false;      // are we done yet?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
@@ -63,14 +62,9 @@ public class DirectHelloWorldPubSub {
         channelProps.setReconnectRetries(10);  // give more time to reconnect
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
+        session.connect();  // connect to the broker
         
-        // User prompt, to use for specific topic
-        System.out.print("Enter your name, or a unique word: ");
-        Scanner userInputScanner = new Scanner(System.in);
-       	uniqueName = userInputScanner.next().trim().replaceAll("\\s+", "_");  // clean up whitespace
-       	userInputScanner.close();
-        
-        // Producer callbacks config: simple anonymous inner-class for handling publishing events
+        // setup Producer callbacks config: simple anonymous inner-class for handling publishing events
         XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
@@ -93,13 +87,13 @@ public class DirectHelloWorldPubSub {
             }
         }, null);  // null is the ProducerEvent handler... don't need it in this simple application
 
-        // Consumer callbacks next: anonymous inner-class for Listener async threaded callbacks
+        // setup Consumer callbacks next: anonymous inner-class for Listener async threaded callbacks
         final XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage msg) {
                 // could be 4 different message types: 3 SMF ones (Text, Map, Stream) and just plain binary
-                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());
-                if (msg.getDestination().getName().equals(TOPIC_PREFIX+"/quit")) isShutdownFlag = true;
+                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());  // just print
+                if (msg.getDestination().getName().endsWith("quit")) isShutdownFlag = true;  // special message
             }
 
             @Override
@@ -111,9 +105,14 @@ public class DirectHelloWorldPubSub {
             }
         });
         
+        // User prompt, to use for specific topic
+        System.out.print("Enter your name, or a unique word: ");
+        Scanner userInputScanner = new Scanner(System.in);
+        String uniqueName = userInputScanner.next().trim().replaceAll("\\s+", "_");  // clean up whitespace
+        userInputScanner.close();
+        
         // Ready to start the application
-        session.connect();  // connect to the broker
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));  // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
         System.out.println("Connected and subscribed. Ready to publish.");
 
@@ -124,7 +123,7 @@ public class DirectHelloWorldPubSub {
                 msgSeqNum++;
             	// specify a text payload
                 message.setText(String.format("Hello World %d from %s!", msgSeqNum,uniqueName));
-                // make a dynamic topic: hello/world/[uniqueName]/123
+                // make a dynamic topic: samples/hello/[uniqueName]/123
                 String topicString = String.format("%s/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum);
                 
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum,topicString);

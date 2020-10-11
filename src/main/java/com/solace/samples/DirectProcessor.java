@@ -22,6 +22,7 @@ package com.solace.samples;
 import java.io.IOException;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -36,7 +37,8 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 public class DirectProcessor {
 
     public void run(String... args) throws JCSMPException {
-        System.out.println("DirectProcessor initializing...");
+        System.out.println(DirectProcessor.class.getSimpleName()+" initializing...");
+        
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
@@ -44,8 +46,13 @@ public class DirectProcessor {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
-        session.connect();
 
         /** Anonymous inner-class for handling publishing events */
         final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
@@ -95,6 +102,7 @@ public class DirectProcessor {
             }
         });
 
+        session.connect();
         Topic topic1 = JCSMPFactory.onlyInstance().createTopic("solace/direct/test/*");
         session.addSubscription(topic1);
         cons.start();
@@ -115,7 +123,6 @@ public class DirectProcessor {
     }
 
     public static void main(String... args) throws JCSMPException {
-
         // Check command line arguments
         if (args.length < 3) {
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",

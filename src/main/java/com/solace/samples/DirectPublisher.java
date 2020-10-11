@@ -30,15 +30,16 @@ import com.solacesystems.jcsmp.JCSMPProducerEventHandler;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
+import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.ProducerEventArgs;
-import com.solacesystems.jcsmp.Topic;
+import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectPublisher {
     
-    static int MSG_RATE = 5;  // Note: Standard edition PubSub+ broker is limited to 10k max ingress
-    static int PAYLOAD_SIZE = 256;
-    static volatile boolean shutdown = false;
+    private static final String TOPIC_PREFIX = "samples/direct";  // used as the topic "root"
+    private static final int PAYLOAD_SIZE = 100;
+    private static volatile boolean isShutdownFlag = false;
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         // Check command line arguments
@@ -47,7 +48,6 @@ public class DirectPublisher {
                     DirectPublisher.class.getSimpleName());
             System.exit(-1);
         }
-
         System.out.println(DirectPublisher.class.getSimpleName()+" initializing...");
 
         // Create a JCSMP Session
@@ -58,71 +58,69 @@ public class DirectPublisher {
         if (args.length > 3) { 
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
-        //properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS,true);
-        JCSMPChannelProperties cp = new JCSMPChannelProperties();
-        cp.setTcpNoDelay(false);  // high throughput magic sauce... but will hurt latencies a bit
-        cp.setCompressionLevel(9);
-        //properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,cp);
-        final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
+        properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS,true);  // 
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
+        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
 
         /** Anonymous inner-class for handling publishing events */
         XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-            @Override
+            @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
                 // deprecated, superseded by responseReceivedEx()
             }
-            @Override
+            @Override @SuppressWarnings("deprecation")
             public void handleError(String messageID, JCSMPException e, long timestamp) {
                 // deprecated, superseded by handleErrorEx()
             }
-            @Override
-            public void responseReceivedEx(Object key) {
-                // DIRECT publishers don't get publish callbacks
+            @Override public void responseReceivedEx(Object key) {
+                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
+            // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
-            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-                // DIRECT publishers don't get publish callbacks
+            public void handleErrorEx(Object key, JCSMPException e, long timestamp) {
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",e);
+                if (e instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdownFlag = true;
+                }
             }
         }, new JCSMPProducerEventHandler() {
             @Override
             public void handleEvent(ProducerEventArgs event) {
-                System.out.println("Received a producer event: "+event);
+                System.out.println("*** Received a producer event: "+event);
                 // should maybe do something with this?
             }
         });
-
+        // done boilerplate
         session.connect();
         
-        Runnable pubThread = new Runnable() {
+        Runnable pubThread = new Runnable() {  // create an application thread for publishing in a loop
             @Override
             public void run() {
-                final int APPROX_NANOS_BETWEEN_MSGS = (1_000_000_000 / MSG_RATE);  // won't be exactly the message rate, but close
                 String topicString;
-                //Topic topic;
-                BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+                BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);  // use a binary message
                 byte[] payload = new byte[PAYLOAD_SIZE];
-                long curNanoTime = System.nanoTime();  // grab the current time before the start of the loop
-                char characterOfTheMoment;
+                char characterOfTheMoment;  // to have variable non-trivial test payloads
                 try {
-                    while (!shutdown) {
-                        characterOfTheMoment = (char)((curNanoTime%26)+65);
-                        Arrays.fill(payload,(byte)characterOfTheMoment);  // fill it with some "random" value
+                    while (!isShutdownFlag) {
+                        // each loop, make a new payload to send
+                        characterOfTheMoment = (char)(Math.round(Math.random()*26)+65);  // choose a random letter [A-Z]
+                        Arrays.fill(payload,(byte)characterOfTheMoment);  // fill the payload completely with that char
                         message.setData(payload);
                         // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
-                        topicString = new StringBuilder("solace/direct/test/").append(characterOfTheMoment).toString();
-                        prod.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
+                        topicString = new StringBuilder(TOPIC_PREFIX).append("/test/").append(characterOfTheMoment).toString();
+                        prod.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                         message.reset();  // reuse this message on the next loop, to avoid having to recreate it
-                        try {
-                            if (APPROX_NANOS_BETWEEN_MSGS >= 1_000_000) {  // i.e. more than 1 ms
-                                Thread.sleep(APPROX_NANOS_BETWEEN_MSGS / 1_000_000);
-                            } else {
-                                Thread.sleep(0,APPROX_NANOS_BETWEEN_MSGS);
-                            }
+/*                        try {
+                            Thread.sleep(100);  // for approximately 10 msg/s.  comment out for max speed
+                            // Note: STANDARD Edition PubSub+ broker is limited to 10k max ingress
                         } catch (InterruptedException e) {
-                            shutdown = true;
+                            isShutdownFlag = true;
                         }
-                        curNanoTime = System.nanoTime();
-                    }
+  */                  }
                 } catch (JCSMPException e) {
                     e.printStackTrace();
                 } finally {
@@ -140,8 +138,11 @@ public class DirectPublisher {
         System.out.println("Connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
         System.in.read();  // wait for user to end
-        System.out.println("Quitting in 1 second.");
-        shutdown = true;
+        System.out.println("ENTER pressed. Quitting in 1 second.");
+        // send a quit control message to anyone listening
+        TextMessage quitMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+        prod.send(quitMessage,JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/quit"));
+        isShutdownFlag = true;
         Thread.sleep(1000);
     }
 }

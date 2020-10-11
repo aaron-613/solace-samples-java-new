@@ -26,7 +26,6 @@ import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
-import com.solacesystems.jcsmp.JCSMPGlobalProperties;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPTransportException;
@@ -35,11 +34,12 @@ import com.solacesystems.jcsmp.XMLMessageListener;
 
 public class DirectSubscriber {
 
-    private static final boolean VERIFY_PAYLOAD_DATA = true;
+    private static final String TOPIC_PREFIX = "samples/direct";  // used as the topic "root"
 
-    private static volatile int msgCounter = 0;
-    private static volatile boolean discardFlag = false;
-    private static volatile boolean shutdown = false;
+    private static boolean VERIFY_PAYLOAD_DATA = true;            // should we do some "processing" of incoming messages?
+    private static volatile int msgCounter = 0;                   // num messages received
+    private static volatile boolean discardDetectedFlag = false;  // detected any discards yet?
+    private static volatile boolean isShutdownFlag = false;       // are we done?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         // Check command line arguments
@@ -49,7 +49,7 @@ public class DirectSubscriber {
             System.exit(-1);
         }
 
-        System.out.println("DirectSubscriber initializing...");
+        System.out.println(DirectSubscriber.class.getSimpleName()+" initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
@@ -57,17 +57,14 @@ public class DirectSubscriber {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
-        JCSMPChannelProperties cp = new JCSMPChannelProperties();
-        cp.setTcpNoDelay(false);  // high throughput magic sauce... but will hurt latencies a bit
-        //cp.setCompressionLevel(9);
-        cp.setReconnectRetries(0);
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, cp);
-        {  // this next block is probably unnecessary until receiving > 100k msg/s, so delete if going slower than that
-            JCSMPGlobalProperties gp = new JCSMPGlobalProperties();
-            gp.setConsumerDefaultFlowCongestionLimit(20000);  // override default (5000)
-            JCSMPFactory.onlyInstance().setGlobalProperties(gp);
-        }
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
+        session.connect();
         
         /** Anonymous inner-class for MessageListener
          *  This demonstrates the async threaded message callback */
@@ -76,76 +73,65 @@ public class DirectSubscriber {
             public void onReceive(BytesXMLMessage msg) {
                 // do you want to do anything with this message?
                 msgCounter++;
-                if (msg.getDiscardIndication()) {  // lost any messages?
+                if (msg.getDiscardIndication()) {  // check if there have been any lost any messages
                     // If the consumer is being over-driven (i.e. publish rates too high), the broker might discard some messages for this consumer
                     // check this flag to know if that's happened
                     // to avoid discards:
                     //  a) reduce publish rate
-                    //  b) increase size of consumer's D-1 egress buffers (check client-profile)
-                    //  c) use multiple-threads or shared subscriptions for parallel processing
-                    discardFlag = true;  // set my own flag
+                    //  b) use multiple-threads or shared subscriptions for parallel processing
+                    //  c) increase size of consumer's D-1 egress buffers (check client-profile) (helps more with bursts)
+                    discardDetectedFlag = true;  // set my own flag
                 }
-                System.out.println(msg.getSequenceNumber());
                 // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
                 if (VERIFY_PAYLOAD_DATA) {
                     // as set in the publisher code, the payload should be filled with the same character as the last letter of the topic
-                    BytesMessage message = (BytesMessage)msg;
-                    if (message.getAttachmentContentLength() > 0) {
-                        byte[] payload = message.getData();
-                        char payloadChar = (char)payload[0];
+                    if (msg instanceof BytesMessage && msg.getAttachmentContentLength() > 0) {  // non-empty BytesMessage
+                        BytesMessage message = (BytesMessage)msg;  // cast the message (could also be TextMessage?)
+                        byte[] payload = message.getData();        // get the payload
+                        char payloadChar = (char)payload[0];       // grab the first byte/char
                         char lastTopicChar = message.getDestination().getName().charAt(message.getDestination().getName().length()-1);
                         if (payloadChar != lastTopicChar) {
                             System.out.println("*** Topic vs. Payload discrepancy *** : didn't match! oh well!");
-                            //VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
+                            VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
                         }
+                    } else {  // unexpected?
+                        System.out.printf("vvv Received non-BytesMessage vvv%n%s%n",msg.dump());  // just print
+                        VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
+                        if (msg.getDestination().getName().endsWith("quit")) isShutdownFlag = true;  // quit message received
                     }
                 }
             }
 
             @Override
-            public void onException(JCSMPException e) {
-                // uh oh!
+            public void onException(JCSMPException e) {  // uh oh!
                 System.err.println("### Exception thrown to the Consumer's onException()");
                 e.printStackTrace();
                 if (e instanceof JCSMPTransportException) {  // pretty bad, not recoverable
                 	// means that all the reconnection attempts have failed
-                	shutdown = true;  // let's quit
+                	isShutdownFlag = true;  // let's quit
                 }
             }
         });
 
-        session.connect();
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("solace/direct/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("solace/control/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));
         cons.start();
-
-        Runnable statsRunnable = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    while (!shutdown) {
-                        Thread.sleep(1000);  // wait 1 second
-                        System.out.printf("Msgs/s: %,d%n",msgCounter);
-                        // simple way of calculating message rates
-                        msgCounter = 0;
-                        if (discardFlag) {
-                            System.out.println("*** Egress discard detected *** : Direct Subscriber unable to keep up with full message rate");
-                            discardFlag = false;  // only show the error once per second
-                        }
-                    }
-                } catch (InterruptedException e) {
-                    System.out.println("I was awoken while waiting");
+        System.out.println("Connected, and running...");
+        try {
+            while (!isShutdownFlag) {
+                Thread.sleep(1000);  // wait 1 second
+                System.out.printf("Msgs/s: %,d%n",msgCounter);
+                // simple way of calculating message rates
+                msgCounter = 0;
+                if (discardDetectedFlag) {
+                    System.out.println("*** Egress discard detected *** : DirectSubscriber unable to keep up with full message rate");
+                    discardDetectedFlag = false;  // only show the error once per second
                 }
             }
-        };
-        Thread t = new Thread(statsRunnable,"Stats Thread");
-        t.setDaemon(true);
-        t.start();
-        
-        System.out.println("Connected, and running. Press [ENTER] to quit.");
-        System.in.read();  // wait for user to end
+        } catch (InterruptedException e) {
+            System.out.println("Main thread awoken while waiting");
+        }
         System.out.println("Quitting in 1 second.");
-        shutdown = true;
+        isShutdownFlag = true;
         Thread.sleep(1000);
         // Close consumer
         cons.close();
