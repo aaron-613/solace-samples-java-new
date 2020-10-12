@@ -93,7 +93,7 @@ public class DirectHelloWorldPubSub {
             public void onReceive(BytesXMLMessage msg) {
                 // could be 4 different message types: 3 SMF ones (Text, Map, Stream) and just plain binary
                 System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());  // just print
-                if (msg.getDestination().getName().endsWith("quit")) isShutdownFlag = true;  // special message
+                if (msg.getDestination().getName().contains("quit")) isShutdownFlag = true;  // special message
             }
 
             @Override
@@ -122,7 +122,7 @@ public class DirectHelloWorldPubSub {
             try {
                 msgSeqNum++;
             	// specify a text payload
-                message.setText(String.format("Hello World %d from %s!", msgSeqNum,uniqueName));
+                message.setText(String.format("Hello World #%d from %s!", msgSeqNum,uniqueName));
                 // make a dynamic topic: solace/samples/hello/[uniqueName]/123
                 String topicString = String.format("%s/hello/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum);
                 
