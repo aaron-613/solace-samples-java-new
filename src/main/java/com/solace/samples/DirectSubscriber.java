@@ -34,7 +34,7 @@ import com.solacesystems.jcsmp.XMLMessageListener;
 
 public class DirectSubscriber {
 
-    private static final String TOPIC_PREFIX = "samples/direct";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
     private static boolean VERIFY_PAYLOAD_DATA = true;            // should we do some "processing" of incoming messages?
     private static volatile int msgCounter = 0;                   // num messages received
@@ -113,7 +113,8 @@ public class DirectSubscriber {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // add multiple wildcard subscriptions
         cons.start();
         System.out.println("Connected, and running...");
         try {

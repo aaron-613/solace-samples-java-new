@@ -40,7 +40,7 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
  */
 public class DirectHelloWorldPubSub {
     
-    private static final String TOPIC_PREFIX = "samples/hello";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static volatile boolean isShutdownFlag = false;      // are we done yet?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
@@ -79,9 +79,9 @@ public class DirectHelloWorldPubSub {
             }
             // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
-            public void handleErrorEx(Object key, JCSMPException e, long timestamp) {
-                System.out.printf("### Producer handleErrorEx() callback: %s%n",e);
-                if (e instanceof JCSMPTransportException) {  // unrecoverable
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
                     isShutdownFlag = true;
                 }
             }
@@ -112,7 +112,7 @@ public class DirectHelloWorldPubSub {
         userInputScanner.close();
         
         // Ready to start the application
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));  // use wildcards
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/hello/>"));  // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
         System.out.println("Connected and subscribed. Ready to publish.");
 
@@ -123,8 +123,8 @@ public class DirectHelloWorldPubSub {
                 msgSeqNum++;
             	// specify a text payload
                 message.setText(String.format("Hello World %d from %s!", msgSeqNum,uniqueName));
-                // make a dynamic topic: samples/hello/[uniqueName]/123
-                String topicString = String.format("%s/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum);
+                // make a dynamic topic: solace/samples/hello/[uniqueName]/123
+                String topicString = String.format("%s/hello/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum);
                 
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum,topicString);
                 producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));

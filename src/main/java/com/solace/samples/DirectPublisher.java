@@ -65,6 +65,7 @@ public class DirectPublisher {
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
+        session.connect();
 
         /** Anonymous inner-class for handling publishing events */
         XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
@@ -81,9 +82,9 @@ public class DirectPublisher {
             }
             // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
-            public void handleErrorEx(Object key, JCSMPException e, long timestamp) {
-                System.out.printf("### Producer handleErrorEx() callback: %s%n",e);
-                if (e instanceof JCSMPTransportException) {  // unrecoverable
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
                     isShutdownFlag = true;
                 }
             }
@@ -95,7 +96,6 @@ public class DirectPublisher {
             }
         });
         // done boilerplate
-        session.connect();
         
         Runnable pubThread = new Runnable() {  // create an application thread for publishing in a loop
             @Override
@@ -111,7 +111,7 @@ public class DirectPublisher {
                         Arrays.fill(payload,(byte)characterOfTheMoment);  // fill the payload completely with that char
                         message.setData(payload);
                         // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
-                        topicString = new StringBuilder(TOPIC_PREFIX).append("/test/").append(characterOfTheMoment).toString();
+                        topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/").append(characterOfTheMoment).toString();
                         prod.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                         message.reset();  // reuse this message, to avoid having to recreate it: better performance
                         try {

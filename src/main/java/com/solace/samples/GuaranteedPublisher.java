@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
+import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -131,6 +132,11 @@ public class GuaranteedPublisher {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
         properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,1);
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
 
         session.connect();
@@ -150,6 +156,10 @@ public class GuaranteedPublisher {
             
 			@Override
 			public void responseReceivedEx(Object key) {
+			    if (key == null) {
+			        System.err.println("NULL KEY IN responseReceivedEx()");
+			        return;
+			    }
 	        	System.out.printf("%s   ACK %d START: %s%n",getTs(),((CorrelationKey)key).id,key);
 				CorrelationKey cKey;
 				try {
@@ -165,6 +175,11 @@ public class GuaranteedPublisher {
 
 			@Override
 			public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+                if (key == null) {
+                    System.err.println("NULL KEY IN handleErrorEx()");
+                    cause.printStackTrace();
+                    return;
+                }
 	        	System.out.println("NACK received: "+key);
 				CorrelationKey cKey;
 				try {
