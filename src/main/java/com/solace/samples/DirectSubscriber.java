@@ -51,11 +51,11 @@ public class DirectSubscriber {
 
         System.out.println(DirectSubscriber.class.getSimpleName()+" initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
+        properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
         if (args.length > 3) {
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
@@ -113,7 +113,7 @@ public class DirectSubscriber {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));//direct/>"));
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // add multiple wildcard subscriptions
         consumer.start();
         System.out.println("Connected, and running...");

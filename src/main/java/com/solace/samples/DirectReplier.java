@@ -22,6 +22,7 @@ package com.solace.samples;
 import java.io.IOException;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -38,12 +39,18 @@ public class DirectReplier {
     public void run(String... args) throws JCSMPException {
         System.out.println("DirectReplier initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
+        properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
         if (args.length > 3) {
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
 
@@ -68,7 +75,8 @@ public class DirectReplier {
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage request) {
-
+                // we will reply from within the callback, only allows for Direct messages
+                
                 if (request.getReplyTo() != null) {
                     System.out.println("Received request, generating response");
                     TextMessage reply = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);

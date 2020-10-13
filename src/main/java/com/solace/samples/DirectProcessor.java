@@ -27,7 +27,8 @@ import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
+import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
@@ -36,17 +37,17 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectProcessor {
 
-    private static final String TOPIC_PREFIX = "samples/direct";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
     public void run(String... args) throws JCSMPException {
         System.out.println(DirectProcessor.class.getSimpleName()+" initializing...");
         
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
+        properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
         if (args.length > 3) {
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
@@ -56,20 +57,30 @@ public class DirectProcessor {
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
 
-        /** Anonymous inner-class for handling publishing events */
-        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
-            @Override
+        /** Simple anonymous inner-class for handling publishing events */
+        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+            @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
-                System.out.println("Producer received response for msg: " + messageID);
+                // deprecated, superseded by responseReceivedEx()
             }
-
-            @Override
+            @Override @SuppressWarnings("deprecation")
             public void handleError(String messageID, JCSMPException e, long timestamp) {
-                System.out.printf("Producer received error for msg: %s@%s - %s%n", messageID, timestamp, e);
+                // deprecated, superseded by handleErrorEx()
+            }
+            @Override public void responseReceivedEx(Object key) {
+                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
+            }
+            // can be called for ACL violations, connection loss, and Persistent NACKs
+            @Override
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+
+                }
             }
         });
 
-        /** Anonymous inner-class for request handling **/
+        /** Simple anonymous inner-class for request handling **/
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage incoming) {

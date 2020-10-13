@@ -26,18 +26,17 @@ import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
-import com.solacesystems.jcsmp.JCSMPProducerEventHandler;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
-import com.solacesystems.jcsmp.ProducerEventArgs;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectPublisher {
     
-    private static final String TOPIC_PREFIX = "samples/direct";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final int APPROX_MSG_RATE_PER_SEC = 10;
     private static final int PAYLOAD_SIZE = 100;
     private static volatile boolean isShutdownFlag = false;
 
@@ -52,13 +51,13 @@ public class DirectPublisher {
 
         // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
+        properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
         if (args.length > 3) { 
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS,true);  // 
+        properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS,true);  // why not?
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
@@ -88,47 +87,42 @@ public class DirectPublisher {
                     isShutdownFlag = true;
                 }
             }
-        }, new JCSMPProducerEventHandler() {
-            @Override
-            public void handleEvent(ProducerEventArgs event) {
-                System.out.println("*** Received a producer event: "+event);
-                // should maybe do something with this?
-            }
         });
         // done boilerplate
         
-        Runnable pubThread = new Runnable() {  // create an application thread for publishing in a loop
-            @Override
-            public void run() {
-                String topicString;
-                BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);  // use a binary message
-                byte[] payload = new byte[PAYLOAD_SIZE];
-                char characterOfTheMoment;  // to have variable non-trivial test payloads
-                try {
-                    while (!isShutdownFlag) {
-                        // each loop, make a new payload to send
-                        characterOfTheMoment = (char)(Math.round(Math.random()*26)+65);  // choose a random letter [A-Z]
-                        Arrays.fill(payload,(byte)characterOfTheMoment);  // fill the payload completely with that char
-                        message.setData(payload);
-                        // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
-                        topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/").append(characterOfTheMoment).toString();
-                        producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
-                        message.reset();  // reuse this message, to avoid having to recreate it: better performance
-                        try {
-                            Thread.sleep(100);  // for approximately 10 msg/s.  set to 0 for max speed
-                            // Note: STANDARD Edition PubSub+ broker is limited to 10k max ingress
-                        } catch (InterruptedException e) {
-                            isShutdownFlag = true;
-                        }
+        Runnable pubThread = () -> {  // create an application thread for publishing in a loop
+            String topicString;
+            BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);  // use a binary message
+            byte[] payload = new byte[PAYLOAD_SIZE];
+            char characterOfTheMoment;  // to have variable non-trivial test payloads
+            try {
+                while (!isShutdownFlag) {
+                    // each loop, make a new payload to send
+                    characterOfTheMoment = (char)(Math.round(System.nanoTime()%26)+65);  // choose a "random" letter [A-Z]
+                    Arrays.fill(payload,(byte)characterOfTheMoment);  // fill the payload completely with that char
+                    message.setData(payload);
+                    // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
+                    topicString = new StringBuilder(TOPIC_PREFIX)
+                            .append("/direct/")
+                            .append(characterOfTheMoment)
+                            .toString();
+                    producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
+                    message.reset();  // reuse this message, to avoid having to recreate it: better performance
+                    try {
+                        //Thread.sleep(1000);  // set to 0 for max speed
+                        Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        // Note: STANDARD Edition PubSub+ broker is limited to 10k max ingress
+                    } catch (InterruptedException e) {
+                        isShutdownFlag = true;
                     }
-                } catch (JCSMPException e) {
-                    e.printStackTrace();
-                } finally {
-                    System.out.print("Shutdown! Stopping Publisher... ");
-                    producer.close();
-                    session.closeSession();
-                    System.out.println("Done.");
                 }
+            } catch (JCSMPException e) {
+                e.printStackTrace();
+            } finally {
+                System.out.print("Shutdown! Stopping Publisher... ");
+                producer.close();
+                session.closeSession();
+                System.out.println("Done.");
             }
         };
         Thread t = new Thread(pubThread,"Publisher Thread");

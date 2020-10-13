@@ -93,7 +93,10 @@ public class DirectHelloWorldPubSub {
             public void onReceive(BytesXMLMessage msg) {
                 // could be 4 different message types: 3 SMF ones (Text, Map, Stream) and just plain binary
                 System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());  // just print
-                if (msg.getDestination().getName().contains("quit")) isShutdownFlag = true;  // special message
+                if (msg.getDestination().getName().contains("quit")) {  // special sample message
+                    System.out.println("QUIT message received, shutting down.");
+                    isShutdownFlag = true;
+                }
             }
 
             @Override
@@ -113,6 +116,7 @@ public class DirectHelloWorldPubSub {
         
         // Ready to start the application
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/hello/>"));  // use wildcards
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
         System.out.println("Connected and subscribed. Ready to publish.");
 

@@ -31,9 +31,11 @@ import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.JCSMPProducerEventHandler;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
+import com.solacesystems.jcsmp.ProducerEventArgs;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
@@ -146,12 +148,12 @@ public class GuaranteedPublisher {
         	
             @Override
             public void responseReceived(String messageID) {
-            	throw new AssertionError("This should never be called!");
+                // deprecated, superseded by responseReceivedEx()
             }
             
             @Override
             public void handleError(String messageID, JCSMPException e, long timestamp) {
-            	throw new AssertionError("This should never be called!");
+                // deprecated, superseded by handleErrorEx()
             }
             
 			@Override
@@ -195,7 +197,12 @@ public class GuaranteedPublisher {
 					System.out.println("NACK ending!");
 				}
 			}
-			
+        }, new JCSMPProducerEventHandler() {
+            @Override
+            public void handleEvent(ProducerEventArgs event) {
+                // as of Oct 2020, this event only occurs when republishing unACKed messages on an unknown flow
+                System.out.println("*** Received a producer event: "+event);
+            }
         });
         
         final double MSG_RATE = 1;
