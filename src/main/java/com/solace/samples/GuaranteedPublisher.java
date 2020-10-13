@@ -42,12 +42,12 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class GuaranteedPublisher {
 	
-	public static class CorrelationKey {
+	public static class MessageInfo {
 		
 		public enum AckStatus {
-			UNACK("UNACKed"),
-			ACK("ACKed"),
-			NACK("NACKed"),
+			UNACK("UNACKed"),  // waiting
+			ACK("ACKed"),      // success
+			NACK("NACKed"),    // failure
 			;
 			
 			final String status;
@@ -64,11 +64,12 @@ public class GuaranteedPublisher {
 		}
 		
 		private static AtomicLong uniquePubSeqCount = new AtomicLong(1);
+		
 		private final BytesXMLMessage message;
-		private AckStatus acknowledged = AckStatus.UNACK;
+		private AckStatus acknowledged = AckStatus.UNACK;  // for now, when first published
 		private final long id = uniquePubSeqCount.getAndIncrement();
 		
-		public CorrelationKey(BytesXMLMessage message) {
+		public MessageInfo(BytesXMLMessage message) {
 			this.message = message;
 		}
 		
@@ -102,9 +103,9 @@ public class GuaranteedPublisher {
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
 
-    private static volatile LinkedList<CorrelationKey> messagesAwaitingAckList = new LinkedList<>();
+    private static volatile LinkedList<MessageInfo> messagesAwaitingAckList = new LinkedList<>();
     private static final int PUBLISH_WINDOW_SIZE = 50;
-    private static final CorrelationKey[] messagesAwaitingAckRingBuffer = new CorrelationKey[PUBLISH_WINDOW_SIZE+1];
+    private static final MessageInfo[] messagesAwaitingAckRingBuffer = new MessageInfo[PUBLISH_WINDOW_SIZE+1];
     private static int ringBufferStart = 0;
     private static int ringBufferEnd = 0;
     private static volatile boolean shutdown = false;
@@ -170,8 +171,8 @@ public class GuaranteedPublisher {
 			        System.err.println("NULL KEY IN responseReceivedEx()");
 			        return;
 			    }
-	        	System.out.printf("%s   ACK %d START: %s%n",getTs(),((CorrelationKey)key).id,key);
-				CorrelationKey cKey;
+	        	System.out.printf("%s   ACK %d START: %s%n",getTs(),((MessageInfo)key).id,key);
+				MessageInfo cKey;
 				try {
                     cKey = messagesAwaitingAckList.remove();
                     if (!cKey.equals(key)) throw new AssertionError("Unexpected key, wrong order!");
@@ -179,7 +180,7 @@ public class GuaranteedPublisher {
 				} catch (NoSuchElementException e) {
 					throw new AssertionError("List was empty!",e);
 				} finally {
-		        	System.out.printf("%s   ACK %d END:   %s%n",getTs(),((CorrelationKey)key).id,key);
+		        	System.out.printf("%s   ACK %d END:   %s%n",getTs(),((MessageInfo)key).id,key);
 				}
 			}
 
@@ -191,7 +192,7 @@ public class GuaranteedPublisher {
                     return;
                 }
 	        	System.out.println("NACK received: "+key);
-				CorrelationKey cKey;
+				MessageInfo cKey;
 				try {
                     cKey = messagesAwaitingAckList.remove();
                     if (!key.equals(cKey)) throw new AssertionError("Unexpected key, wrong order!");
@@ -231,7 +232,7 @@ public class GuaranteedPublisher {
 			            BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
 			        	message.setData(payload);
 			        	message.setDeliveryMode(DeliveryMode.PERSISTENT);
-			        	CorrelationKey key = new CorrelationKey(message);
+			        	MessageInfo key = new MessageInfo(message);
 			        	message.setCorrelationKey(key);
 			        	message.setApplicationMessageId(UUID.randomUUID().toString());  // for track-and-trace
 			        	messagesAwaitingAckList.add(key);  // NEED NEED NEED to add it before the send() in case of race condition and the ACK comes back before it's added to the list
