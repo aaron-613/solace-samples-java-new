@@ -128,7 +128,7 @@ public class DirectHelloWorldPubSub {
                 
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum,topicString);
                 producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
-                message.reset();  // reuse this message on the next loop, to avoid having to recreate it
+                message.reset();     // reuse this message on the next loop, to avoid having to recreate it
                 Thread.sleep(5000);  // take a pause
 	        } catch (JCSMPException e) {
 	            System.out.printf("### Exception caught during publish(): %s%n",e);

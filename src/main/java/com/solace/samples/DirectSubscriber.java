@@ -68,7 +68,7 @@ public class DirectSubscriber {
         
         /** Anonymous inner-class for MessageListener
          *  This demonstrates the async threaded message callback */
-        final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
+        final XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage msg) {
                 // do you want to do anything with this message?
@@ -115,7 +115,7 @@ public class DirectSubscriber {
 
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/>"));
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // add multiple wildcard subscriptions
-        cons.start();
+        consumer.start();
         System.out.println("Connected, and running...");
         try {
             while (!isShutdownFlag) {
@@ -135,7 +135,7 @@ public class DirectSubscriber {
         isShutdownFlag = true;
         Thread.sleep(1000);
         // Close consumer
-        cons.close();
+        consumer.close();
         session.closeSession();
     }
 }

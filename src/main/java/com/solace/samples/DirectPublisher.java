@@ -68,7 +68,7 @@ public class DirectPublisher {
         session.connect();
 
         /** Anonymous inner-class for handling publishing events */
-        XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+        XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
                 // deprecated, superseded by responseReceivedEx()
@@ -112,10 +112,10 @@ public class DirectPublisher {
                         message.setData(payload);
                         // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
                         topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/").append(characterOfTheMoment).toString();
-                        prod.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
+                        producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                         message.reset();  // reuse this message, to avoid having to recreate it: better performance
                         try {
-                            Thread.sleep(100);  // for approximately 10 msg/s.  comment out for max speed
+                            Thread.sleep(100);  // for approximately 10 msg/s.  set to 0 for max speed
                             // Note: STANDARD Edition PubSub+ broker is limited to 10k max ingress
                         } catch (InterruptedException e) {
                             isShutdownFlag = true;
@@ -125,7 +125,7 @@ public class DirectPublisher {
                     e.printStackTrace();
                 } finally {
                     System.out.print("Shutdown! Stopping Publisher... ");
-                    prod.close();
+                    producer.close();
                     session.closeSession();
                     System.out.println("Done.");
                 }
@@ -141,7 +141,7 @@ public class DirectPublisher {
         System.out.println("ENTER pressed. Quitting in 1 second.");
         // send a quit control message to anyone listening
         TextMessage quitMessage = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        prod.send(quitMessage,JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/quit"));
+        producer.send(quitMessage,JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/quit"));
         isShutdownFlag = true;
         Thread.sleep(1000);
     }

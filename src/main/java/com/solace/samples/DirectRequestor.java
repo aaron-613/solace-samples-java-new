@@ -49,7 +49,7 @@ public class DirectRequestor {
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
         properties.setProperty(JCSMPProperties.USERNAME, args[1]); // client-username
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[21]); // message-vpn
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[2]); // message-vpn
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
@@ -84,13 +84,13 @@ public class DirectRequestor {
         XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);
         consumer.start();
 
-        final Topic topic = JCSMPFactory.onlyInstance().createTopic("tutorial/requests");
+        final Topic topic = JCSMPFactory.onlyInstance().createTopic("GET/hello");
 
         //Time to wait for a reply before timing out
         final int timeoutMs = 10000;
         TextMessage request = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         final String text = "Sample Request";
-        request.setText(text);
+        //request.setText(text);
 
         try {
             Requestor requestor = session.createRequestor();
