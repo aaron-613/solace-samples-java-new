@@ -22,13 +22,13 @@ import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessage;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
-public class HowToDoBlockingSynchronousSendGuaranteed implements SessionEventHandler, JCSMPStreamingPublishCorrelatingEventHandler {
+public class BlockingSynchronousSendGuaranteed implements SessionEventHandler, JCSMPStreamingPublishCorrelatingEventHandler {
 
     JCSMPSession session;
     XMLMessageProducer producer;
     volatile Exception publishException;  // Used to pass the exception associated with a NACK back to the application
     
-    public HowToDoBlockingSynchronousSendGuaranteed() {
+    public BlockingSynchronousSendGuaranteed() {
     }
 
     public void setup() throws JCSMPException {
@@ -146,7 +146,7 @@ public class HowToDoBlockingSynchronousSendGuaranteed implements SessionEventHan
      */
     public static void main(String[] args) {
         try {
-            HowToDoBlockingSynchronousSendGuaranteed publisher = new HowToDoBlockingSynchronousSendGuaranteed();
+            BlockingSynchronousSendGuaranteed publisher = new BlockingSynchronousSendGuaranteed();
             publisher.setup();
             publisher.run();
         } catch (Exception e) {

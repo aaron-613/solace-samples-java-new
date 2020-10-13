@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.solacesystems.jcsmp.BytesMessage;
@@ -97,8 +98,15 @@ public class GuaranteedPublisher {
 		}
 		
 	}
+	
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+
 
     private static volatile LinkedList<CorrelationKey> messagesAwaitingAckList = new LinkedList<>();
+    private static final int PUBLISH_WINDOW_SIZE = 50;
+    private static final CorrelationKey[] messagesAwaitingAckRingBuffer = new CorrelationKey[PUBLISH_WINDOW_SIZE+1];
+    private static int ringBufferStart = 0;
+    private static int ringBufferEnd = 0;
     private static volatile boolean shutdown = false;
 
     static volatile long lastTs = System.nanoTime() / 1_000_000;
@@ -211,7 +219,7 @@ public class GuaranteedPublisher {
         Runnable pubThread = new Runnable() {
 			@Override
 			public void run() {
-		    	Topic topic = JCSMPFactory.onlyInstance().createTopic("a/b/c");
+		    	Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/pers/"+"a/b/c");
 		        byte[] payload = new byte[PAYLOAD_SIZE];
 		        long curNanoTime;
 		        try {
@@ -225,7 +233,7 @@ public class GuaranteedPublisher {
 			        	message.setDeliveryMode(DeliveryMode.PERSISTENT);
 			        	CorrelationKey key = new CorrelationKey(message);
 			        	message.setCorrelationKey(key);
-			        	message.setApplicationMessageId(Long.toString(key.getId()));  // maybe a GUID would be better?  For track-and-trace?
+			        	message.setApplicationMessageId(UUID.randomUUID().toString());  // for track-and-trace
 			        	messagesAwaitingAckList.add(key);  // NEED NEED NEED to add it before the send() in case of race condition and the ACK comes back before it's added to the list
 			        	
 			        	System.out.printf("%s  SEND %d START: %s%n",getTs(),key.id,key);
