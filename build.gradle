@@ -94,7 +94,7 @@ scripts.each() { scriptName, className ->
         mainClassName = className
         applicationName = scriptName
         outputDir = new File(project.buildDir, 'scripts')
-        classpath = jar.outputs.files + project.configurations.runtime
+        classpath = jar.outputs.files + project.configurations.runtimeClasspath
     }
     applicationDistribution.into("bin") {
         from(t)
