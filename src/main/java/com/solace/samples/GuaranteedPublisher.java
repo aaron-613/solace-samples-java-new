@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.solacesystems.jcsmp.BytesMessage;
@@ -41,86 +42,88 @@ import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class GuaranteedPublisher {
-	
-	public static class MessageInfo {
-		
-		public enum AckStatus {
-			UNACK("UNACKed"),  // waiting
-			ACK("ACKed"),      // success
-			NACK("NACKed"),    // failure
-			;
-			
-			final String status;
-			
-			AckStatus(String status) {
-				this.status = status;
-			}
-			
-			@Override
-			public String toString() {
-				return String.format("%-7s",status);
-			}
-			
-		}
-		
-		private static AtomicLong uniquePubSeqCount = new AtomicLong(1);
-		
-		private final BytesXMLMessage message;
-		private AckStatus acknowledged = AckStatus.UNACK;  // for now, when first published
-		private final long id = uniquePubSeqCount.getAndIncrement();
-		
-		public MessageInfo(BytesXMLMessage message) {
-			this.message = message;
-		}
-		
-		public long getId() {
-			return id;
-		}
-		
-		public void ack() {
-			acknowledged = AckStatus.ACK;
-		}
-		
-		public void nack() {
-			acknowledged = AckStatus.NACK;
-		}
-		
-		public AckStatus getAcknowledged() {
-			return acknowledged;
-		}
-		
-		public BytesXMLMessage getMessage() {
-			return message;
-		}
-		
-		@Override
-		public String toString() {
-			return String.format("MsgID: %d %s -- %s",id,acknowledged,message.toString());
-		}
-		
-	}
-	
+    
+    public static class MessageInfo {
+        
+        public enum AckStatus {
+            UNACK("UNACKed"),  // waiting
+            ACK("ACKed"),      // success
+            NACK("NACKed"),    // failure
+            ;
+            
+            final String status;
+            
+            AckStatus(String status) {
+                this.status = status;
+            }
+            
+            @Override
+            public String toString() {
+                return String.format("%-7s",status);  // fixed-width, right-align the status
+            }
+        }
+        
+        private static AtomicLong myUniquePubSeqCount = new AtomicLong(1);
+        
+        private BytesXMLMessage message;
+        private AckStatus acknowledged = AckStatus.UNACK;  // for now, when first published
+        private long myUniqueId = myUniquePubSeqCount.getAndIncrement();
+        
+        public MessageInfo(BytesXMLMessage message) {
+            this.message = message;
+        }
+        
+        public long getId() {
+            return myUniqueId;
+        }
+        
+        public void ack() {
+            acknowledged = AckStatus.ACK;
+        }
+        
+        public void nack() {
+            acknowledged = AckStatus.NACK;
+        }
+        
+        public AckStatus getAcknowledged() {
+            return acknowledged;
+        }
+        
+        public BytesXMLMessage getMessage() {
+            return message;
+        }
+        
+        @Override
+        public String toString() {
+            return String.format("MsgID: %d %s -- %s",myUniqueId,acknowledged,message.toString());
+        }
+        
+    }
+    
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
 
     private static volatile LinkedList<MessageInfo> messagesAwaitingAckList = new LinkedList<>();
-    private static final int PUBLISH_WINDOW_SIZE = 50;
-    private static final MessageInfo[] messagesAwaitingAckRingBuffer = new MessageInfo[PUBLISH_WINDOW_SIZE+1];
-    private static int ringBufferStart = 0;
-    private static int ringBufferEnd = 0;
+    private static final int PUBLISH_WINDOW_SIZE = 1;
+    private static final ArrayBlockingQueue<BytesMessage> messagesPoolRingBuffer = new ArrayBlockingQueue<>(PUBLISH_WINDOW_SIZE+1);
+    static {
+        for (int i=0;i<PUBLISH_WINDOW_SIZE;i++) {
+            messagesPoolRingBuffer.add(JCSMPFactory.onlyInstance().createMessage(BytesMessage.class));
+        }
+    }
     private static volatile boolean shutdown = false;
 
     static volatile long lastTs = System.nanoTime() / 1_000_000;
     static synchronized String getTs() {
-    	long ts = System.nanoTime() / 1_000_000;  // milliseconds
-    	try {
-	    	if (ts - lastTs > 100) {
-	        	return String.format(" -- gap --%n%d",ts);
-	    	}
-	    	return Long.toString(ts);
-    	} finally {
-    		lastTs = ts;
-    	}
+        long ts = System.nanoTime() / 1_000_000;  // milliseconds
+        try {
+            if (ts - lastTs > 100) {
+                return String.format(" -- gap --%n%d",ts);
+            }
+            return Long.toString(ts);
+        } finally {
+            lastTs = ts;
+        }
     }
     
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
@@ -142,19 +145,18 @@ public class GuaranteedPublisher {
         if (args.length > 3) { 
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
-        properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,1);
+        properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,PUBLISH_WINDOW_SIZE);
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
-
         session.connect();
 
         /** Anonymous inner-class for handling publishing events */
         final XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-        	
+            
             @Override
             public void responseReceived(String messageID) {
                 // deprecated, superseded by responseReceivedEx()
@@ -165,47 +167,48 @@ public class GuaranteedPublisher {
                 // deprecated, superseded by handleErrorEx()
             }
             
-			@Override
-			public void responseReceivedEx(Object key) {
-			    if (key == null) {
-			        System.err.println("NULL KEY IN responseReceivedEx()");
-			        return;
-			    }
-	        	System.out.printf("%s   ACK %d START: %s%n",getTs(),((MessageInfo)key).id,key);
-				MessageInfo cKey;
-				try {
+            @Override
+            public void responseReceivedEx(Object key) {
+                if (key == null) {
+                    System.err.println("NULL KEY IN responseReceivedEx()");
+                    return;
+                }
+                System.out.printf("%s   ACK %d START: %s%n",getTs(),((MessageInfo)key).myUniqueId,key);
+                MessageInfo cKey;
+                try {
                     cKey = messagesAwaitingAckList.remove();
                     if (!cKey.equals(key)) throw new AssertionError("Unexpected key, wrong order!");
                     cKey.ack();
-				} catch (NoSuchElementException e) {
-					throw new AssertionError("List was empty!",e);
-				} finally {
-		        	System.out.printf("%s   ACK %d END:   %s%n",getTs(),((MessageInfo)key).id,key);
-				}
-			}
+                } catch (NoSuchElementException e) {
+                    throw new AssertionError("List was empty!",e);
+                } finally {
+                    System.out.printf("%s   ACK %d END:   %s%n",getTs(),((MessageInfo)key).myUniqueId,key);
+                }
+            }
 
-			@Override
-			public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+            // this method could be run for other things besides a NACK, so keep that in mind
+            @Override
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 if (key == null) {
                     System.err.println("NULL KEY IN handleErrorEx()");
                     cause.printStackTrace();
                     return;
                 }
-	        	System.out.println("NACK received: "+key);
-				MessageInfo cKey;
-				try {
+                System.out.println("NACK received: "+key);
+                MessageInfo cKey;
+                try {
                     cKey = messagesAwaitingAckList.remove();
                     if (!key.equals(cKey)) throw new AssertionError("Unexpected key, wrong order!");
                     cKey.nack();
                     // now what?? Should we redlivery or somtehing?
-				} catch (NoSuchElementException e) {
-					throw new AssertionError("List was empty!",e);
-				} catch (NullPointerException e) {
-					throw new AssertionError("This should be impossible, key ==  null!",e);
-				} finally {
-					System.out.println("NACK ending!");
-				}
-			}
+                } catch (NoSuchElementException e) {
+                    throw new AssertionError("List was empty!",e);
+                } catch (NullPointerException e) {
+                    throw new AssertionError("This should be impossible, key ==  null!",e);
+                } finally {
+                    System.out.println("NACK ending!");
+                }
+            }
         }, new JCSMPProducerEventHandler() {
             @Override
             public void handleEvent(ProducerEventArgs event) {
@@ -218,42 +221,47 @@ public class GuaranteedPublisher {
         final int PAYLOAD_SIZE = 100;
 
         Runnable pubThread = new Runnable() {
-			@Override
-			public void run() {
-		    	Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/pers/"+"a/b/c");
-		        byte[] payload = new byte[PAYLOAD_SIZE];
-		        long curNanoTime;
-		        try {
-			        while (!shutdown) {
-			        	curNanoTime = System.nanoTime();  // time at the start of this loop
-//			        	Arrays.fill(payload,(byte)(System.currentTimeMillis()%256));  // fill it with some "random" value
-			        	Arrays.fill(payload,(byte)65);  // fill it with some "random" value
-			        	// use a BytesMessage this sample, instead of TextMessage
-			            BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
-			        	message.setData(payload);
-			        	message.setDeliveryMode(DeliveryMode.PERSISTENT);
-			        	MessageInfo key = new MessageInfo(message);
-			        	message.setCorrelationKey(key);
-			        	message.setApplicationMessageId(UUID.randomUUID().toString());  // for track-and-trace
-			        	messagesAwaitingAckList.add(key);  // NEED NEED NEED to add it before the send() in case of race condition and the ACK comes back before it's added to the list
-			        	
-			        	System.out.printf("%s  SEND %d START: %s%n",getTs(),key.id,key);
-			        	prod.send(message,topic);
-			        	System.out.printf("%s  SEND %d END:   %s%n",getTs(),key.id,key);
-			        	
-			        	//while (System.nanoTime() < (curNanoTime + (1_000_000_000 / MSG_RATE))) { }
-			        		// busy wait
-			        }
-		        } catch (JCSMPException e) {
-		        	e.printStackTrace();
+            @Override
+            public void run() {
+                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/pers/"+"a/b/c");
+                byte[] payload = new byte[PAYLOAD_SIZE];
+                long curNanoTime;
+                try {
+                    while (!shutdown) {
+                        curNanoTime = System.nanoTime();  // time at the start of this loop
+//                        Arrays.fill(payload,(byte)(System.currentTimeMillis()%256));  // fill it with some "random" value
+                        Arrays.fill(payload,(byte)65);  // fill it with some "random" value
+                        // use a BytesMessage this sample, instead of TextMessage
+                        BytesMessage message = messagesPoolRingBuffer.poll();
+                        if (message == null) {  // somehow the ring buffer is empty????
+                            System.out.println("EMPTY RING BUFFER WHAT??????? Should be impossible due to AD publish window size");
+                            throw new AssertionError("EMPTY RING BUFFER");
+                        }
+                        message.reset();
+                        message.setData(payload);
+                        message.setDeliveryMode(DeliveryMode.PERSISTENT);
+                        message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
+                        MessageInfo key = new MessageInfo(message);  // make a new structure for watching this message
+                        message.setCorrelationKey(key);
+                        messagesAwaitingAckList.add(key);  // NEED NEED NEED to add it before the send() in case of race condition and the ACK comes back before it's added to the list
+                        
+                        System.out.printf("%s  SEND %d START: %s%n",getTs(),key.myUniqueId,key);
+                        prod.send(message,topic);
+                        System.out.printf("%s  SEND %d END:   %s%n",getTs(),key.myUniqueId,key);
+                        
+                        //while (System.nanoTime() < (curNanoTime + (1_000_000_000 / MSG_RATE))) { }
+                            // busy wait
+                    }
+                } catch (JCSMPException e) {
+                    e.printStackTrace();
                 } finally {
                     System.out.print("Shutdown! Stopping Publisher... ");
                     prod.close();
                     session.closeSession();
                     System.out.println("Done.");
-		        }
-			}
-		};
+                }
+            }
+        };
         Thread t = new Thread(pubThread,"Publisher Thread");
         t.setDaemon(true);
         t.start();
@@ -264,7 +272,5 @@ public class GuaranteedPublisher {
         System.out.println("Quitting in 1 second.");
         shutdown = true;
         Thread.sleep(1000);
-        
-
     }
 }

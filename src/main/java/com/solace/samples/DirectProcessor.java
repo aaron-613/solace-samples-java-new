@@ -30,11 +30,14 @@ import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.TextMessage;
-import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
+/**
+ * A Processor is a microservice/application that receives a message, does something with the info,
+ * and then sends it on..!
+ */
 public class DirectProcessor {
 
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
@@ -83,14 +86,15 @@ public class DirectProcessor {
         /** Simple anonymous inner-class for request handling **/
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
-            public void onReceive(BytesXMLMessage incoming) {
-                if (incoming.getReplyTo() == null) {  // not expecting reply
-                    TextMessage onwardsMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-                    final String upperCaseMessage = incoming.dump().toUpperCase();
-                    onwardsMsg.setText(upperCaseMessage);
-                    String onwardsTopic = TOPIC_PREFIX+"/proc/"+incoming.getDestination().getName().toUpperCase();
+            public void onReceive(BytesXMLMessage inboundMsg) {
+                if (inboundMsg.getReplyTo() == null) {  // not expecting reply
+                    TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+                    // how to process the incoming message? maybe do a DB lookup? or add some payload
+                    final String upperCaseMessage = inboundMsg.dump().toUpperCase();  // as an example of "processing"
+                    outboundMsg.setText(upperCaseMessage);
+                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundMsg.getDestination().getName()).toString();//.charAt(index)toUpperCase();
                     try {
-                        producer.send(onwardsMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
+                        producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                     } catch (JCSMPException e) {
                         System.out.println("### Error sending reply.");
                         e.printStackTrace();
@@ -107,12 +111,11 @@ public class DirectProcessor {
         });
 
         session.connect();
-        Topic topic1 = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/test/>");  // listen to 
-        session.addSubscription(topic1);
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/pub/>"));  // listen to
         cons.start();
 
         // Consume-only session is now hooked up and running!
-        System.out.println("Listening for incoming messages on topic " + topic1 + " ... Press enter to exit");
+        System.out.println("Listening for incoming messages. Press [ENTER] to exit");
         try {
             System.in.read();
         } catch (IOException e) {

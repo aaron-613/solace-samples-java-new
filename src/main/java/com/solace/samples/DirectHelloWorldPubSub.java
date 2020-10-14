@@ -41,7 +41,7 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 public class DirectHelloWorldPubSub {
     
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static volatile boolean isShutdownFlag = false;      // are we done yet?
+    private static volatile boolean isShutdown = false;      // are we done yet?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
@@ -57,12 +57,14 @@ public class DirectHelloWorldPubSub {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);
         }
-        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(10);  // give more time to reconnect
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
+        System.out.print("Connecting... ");
         session.connect();  // connect to the broker
+        System.out.println("Connected.");
         
         // setup Producer callbacks config: simple anonymous inner-class for handling publishing events
         XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
@@ -82,10 +84,10 @@ public class DirectHelloWorldPubSub {
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdownFlag = true;
+                    isShutdown = true;
                 }
             }
-        }, null);  // null is the ProducerEvent handler... don't need it in this simple application
+        }, null);  // null is the ProducerEvent handler... do not need it in this simple application
 
         // setup Consumer callbacks next: anonymous inner-class for Listener async threaded callbacks
         final XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
@@ -95,7 +97,7 @@ public class DirectHelloWorldPubSub {
                 System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());  // just print
                 if (msg.getDestination().getName().contains("quit")) {  // special sample message
                     System.out.println("QUIT message received, shutting down.");
-                    isShutdownFlag = true;
+                    isShutdown = true;
                 }
             }
 
@@ -103,7 +105,7 @@ public class DirectHelloWorldPubSub {
             public void onException(JCSMPException e) {  // oh no!
                 System.out.printf("### MessageListener's onException(): %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdownFlag = true;
+                    isShutdown = true;
                 }
             }
         });
@@ -122,7 +124,7 @@ public class DirectHelloWorldPubSub {
 
         int msgSeqNum = 0;
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        while (!isShutdownFlag) {  // time to loop!
+        while (!isShutdown) {  // time to loop!
             try {
                 msgSeqNum++;
             	// specify a text payload
@@ -137,7 +139,7 @@ public class DirectHelloWorldPubSub {
 	        } catch (JCSMPException e) {
 	            System.out.printf("### Exception caught during publish(): %s%n",e);
 	            if (e instanceof JCSMPTransportException) {  // unrecoverable
-	                isShutdownFlag = true;
+	                isShutdown = true;
 	            }
 	        } catch (InterruptedException e) {
 	            // IGNORE... probably getting shut down

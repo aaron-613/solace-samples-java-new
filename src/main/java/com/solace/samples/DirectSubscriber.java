@@ -24,6 +24,8 @@ import java.io.IOException;
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
+import com.solacesystems.jcsmp.JCSMPErrorResponseException;
+import com.solacesystems.jcsmp.JCSMPErrorResponseSubcodeEx;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -36,10 +38,10 @@ public class DirectSubscriber {
 
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
-    private static boolean VERIFY_PAYLOAD_DATA = true;            // should we do some "processing" of incoming messages?
-    private static volatile int msgCounter = 0;                   // num messages received
-    private static volatile boolean discardDetectedFlag = false;  // detected any discards yet?
-    private static volatile boolean isShutdownFlag = false;       // are we done?
+    private static boolean VERIFY_PAYLOAD_DATA = true;            // should we do some "processing" of incoming messages? (just for example)
+    private static volatile int msgRecvCounter = 0;                   // num messages received
+    private static volatile boolean hasDetectedDiscard = false;  // detected any discards yet?
+    private static volatile boolean isShutdown = false;          // are we done?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         // Check command line arguments
@@ -57,7 +59,7 @@ public class DirectSubscriber {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
@@ -72,7 +74,7 @@ public class DirectSubscriber {
             @Override
             public void onReceive(BytesXMLMessage msg) {
                 // do you want to do anything with this message?
-                msgCounter++;
+                msgRecvCounter++;
                 if (msg.getDiscardIndication()) {  // check if there have been any lost any messages
                     // If the consumer is being over-driven (i.e. publish rates too high), the broker might discard some messages for this consumer
                     // check this flag to know if that's happened
@@ -80,7 +82,7 @@ public class DirectSubscriber {
                     //  a) reduce publish rate
                     //  b) use multiple-threads or shared subscriptions for parallel processing
                     //  c) increase size of consumer's D-1 egress buffers (check client-profile) (helps more with bursts)
-                    discardDetectedFlag = true;  // set my own flag
+                    hasDetectedDiscard = true;  // set my own flag
                 }
                 // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
                 if (VERIFY_PAYLOAD_DATA) {
@@ -97,8 +99,11 @@ public class DirectSubscriber {
                     } else {  // unexpected?
                         System.out.printf("vvv Received non-BytesMessage vvv%n%s%n",msg.dump());  // just print
                         VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
-                        if (msg.getDestination().getName().endsWith("quit")) isShutdownFlag = true;  // quit message received
                     }
+                }
+                if (msg.getDestination().getName().endsWith("control/quit")) {  // special sample message
+                    System.out.println("QUIT message received, shutting down.");
+                    isShutdown = true;
                 }
             }
 
@@ -108,7 +113,10 @@ public class DirectSubscriber {
                 e.printStackTrace();
                 if (e instanceof JCSMPTransportException) {  // pretty bad, not recoverable
                 	// means that all the reconnection attempts have failed
-                	isShutdownFlag = true;  // let's quit
+                	isShutdown = true;  // let's quit
+                } else if (e instanceof JCSMPErrorResponseException) {  // might have some extra info
+                    JCSMPErrorResponseException e1 = (JCSMPErrorResponseException)e;
+                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e1.getSubcodeEx())+": "+e1.getResponsePhrase());
                 }
             }
         });
@@ -118,21 +126,20 @@ public class DirectSubscriber {
         consumer.start();
         System.out.println("Connected, and running...");
         try {
-            while (!isShutdownFlag) {
+            while (System.in.available() == 0 && !isShutdown) {
                 Thread.sleep(1000);  // wait 1 second
-                System.out.printf("Msgs/s: %,d%n",msgCounter);
-                // simple way of calculating message rates
-                msgCounter = 0;
-                if (discardDetectedFlag) {
+                System.out.printf("Received msgs/s: %,d%n",msgRecvCounter);  // simple way of calculating message rates
+                msgRecvCounter = 0;
+                if (hasDetectedDiscard) {
                     System.out.println("*** Egress discard detected *** : DirectSubscriber unable to keep up with full message rate");
-                    discardDetectedFlag = false;  // only show the error once per second
+                    hasDetectedDiscard = false;  // only show the error once per second
                 }
             }
         } catch (InterruptedException e) {
             System.out.println("Main thread awoken while waiting");
         }
         System.out.println("Quitting in 1 second.");
-        isShutdownFlag = true;
+        isShutdown = true;
         Thread.sleep(1000);
         // Close consumer
         consumer.close();

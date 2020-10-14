@@ -43,7 +43,6 @@ public class DirectRequestor {
                     DirectRequestor.class.getSimpleName());
             System.exit(-1);
         }
-
         System.out.println("DirectRequestor initializing...");
 
         // Create a JCSMP Session
@@ -86,23 +85,23 @@ public class DirectRequestor {
                 System.out.printf("Producer received error for msg: %s@%s - %s%n",
                         key,timestamp,cause);                
             }
-        });
+        });  // null is the ProducerEvent handler... do not need it in this simple application
 
         XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);
         consumer.start();
 
-        final Topic topic = JCSMPFactory.onlyInstance().createTopic("GET/hello");
-
         //Time to wait for a reply before timing out
         final int timeoutMs = 10000;
-        TextMessage request = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+        TextMessage requestMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         final String text = "Sample Request";
         //request.setText(text);
 
         try {
-            Requestor requestor = session.createRequestor();
+            Requestor requestor = session.createRequestor();  // create the Requestor object
+            Topic topic = JCSMPFactory.onlyInstance().createTopic("solace/samples/direct/request");
             System.out.printf("Connected. About to send request message '%s' to topic '%s'...%n",text,topic.getName());
-            BytesXMLMessage reply = requestor.request(request, timeoutMs, topic);
+            // perform blocking/synchronous call using convenience method request()
+            BytesXMLMessage reply = requestor.request(requestMsg, timeoutMs, topic);
 
             // Process the reply
             if (reply instanceof TextMessage) {
