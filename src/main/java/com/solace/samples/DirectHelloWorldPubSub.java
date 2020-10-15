@@ -51,6 +51,15 @@ public class DirectHelloWorldPubSub {
                     DirectHelloWorldPubSub.class.getSimpleName());
             System.exit(-1);
         }
+        
+        // User prompt, to use for specific topic
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String uniqueName = "";
+        while (uniqueName.isEmpty()) {
+            System.out.printf("Enter your name, or a unique word: ");
+            uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
+        }
+        
         // Build the properties object for initializing the Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);
@@ -62,12 +71,10 @@ public class DirectHelloWorldPubSub {
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(10);  // give more time to reconnect
-        channelProps.setConnectRetriesPerHost(2);
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
-        System.out.println("Connecting... ");
+        System.out.println("%nConnecting... ");
         session.connect();  // connect to the broker
-        System.out.println("Connected.");
         
         // setup Producer callbacks config: simple anonymous inner-class for handling publishing events
         XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
@@ -113,22 +120,18 @@ public class DirectHelloWorldPubSub {
             }
         });
         
-        // User prompt, to use for specific topic
-        System.out.printf("%nEnter your name, or a unique word: ");
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
-        
         // Ready to start the application
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/hello/>"));    // use wildcards
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
         System.out.printf("%nConnected and subscribed. Ready to publish. Press [ENTER] to quit.%n");
-        System.out.printf("  Run this sample twice to see true publish-subscribe%n%n");
+        System.out.printf(" - Run this sample twice to see true publish-subscribe. -%n%n");
 
         int msgSeqNum = 0;
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
             try {
+                Thread.sleep(5000);  // take a pause
                 msgSeqNum++;
             	// specify a text payload
                 message.setText(String.format("Hello World #%d from %s!", msgSeqNum,uniqueName));
@@ -138,7 +141,6 @@ public class DirectHelloWorldPubSub {
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum,topicString);
                 producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it
-                Thread.sleep(5000);  // take a pause
 	        } catch (JCSMPException e) {
 	            System.out.printf("### Exception caught during publish(): %s%n",e);
 	            if (e instanceof JCSMPTransportException) {  // unrecoverable

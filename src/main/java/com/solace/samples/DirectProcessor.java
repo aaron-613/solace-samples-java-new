@@ -92,6 +92,7 @@ public class DirectProcessor {
                     // how to process the incoming message? maybe do a DB lookup? or add some payload
                     final String upperCaseMessage = inboundMsg.dump().toUpperCase();  // as an example of "processing"
                     outboundMsg.setText(upperCaseMessage);
+                    if (!inboundMsg.getApplicationMessageId().isEmpty()) outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());
                     String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundMsg.getDestination().getName()).toString();//.charAt(index)toUpperCase();
                     try {
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));

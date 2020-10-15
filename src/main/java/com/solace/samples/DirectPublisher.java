@@ -33,15 +33,15 @@ import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
+import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
-import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectPublisher {
     
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int APPROX_MSG_RATE_PER_SEC = 2;
+    private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 100;
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
@@ -114,6 +114,10 @@ public class DirectPublisher {
                     char chosenCharacter = (char)(Math.round(System.nanoTime()%26)+65);  // choose a "random" letter [A-Z]
                     Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
                     message.setData(payload);
+                    // user property!
+                    SDTMap map = JCSMPFactory.onlyInstance().createMap();
+                    map.putString("this is a test","hello world");
+                    message.setProperties(map);
                     // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
                     topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/pub/").append(chosenCharacter).toString();
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
