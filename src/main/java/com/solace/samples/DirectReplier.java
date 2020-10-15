@@ -36,6 +36,9 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectReplier {
 
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+
+    
     public void run(String... args) throws JCSMPException {
         System.out.println("DirectReplier initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
@@ -54,10 +57,6 @@ public class DirectReplier {
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
 
-        final Topic topic = JCSMPFactory.onlyInstance().createTopic("GET/>");
-        final Topic topic2 = JCSMPFactory.onlyInstance().createTopic("POST/>");
-        
-
         /** Anonymous inner-class for handling publishing events */
         final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
             @Override
@@ -74,25 +73,30 @@ public class DirectReplier {
         /** Anonymous inner-class for request handling **/
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
-            public void onReceive(BytesXMLMessage request) {
+            public void onReceive(BytesXMLMessage requestMsg) {
                 // we will reply from within the callback, only allows for Direct messages
                 
-                if (request.getReplyTo() != null) {
+                if (requestMsg.getReplyTo() != null) {
                     System.out.println("Received request, generating response");
-                    TextMessage reply = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+                    TextMessage replyMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+                    if (!requestMsg.getApplicationMessageId().isEmpty()) {
+                        replyMsg.setApplicationMessageId(requestMsg.getApplicationMessageId());
+                    }
 
                     final String text = "Sample response";
                     //reply.setText(text);
                     try {
-                        reply.setText("Your path was: "+request.getProperties().getString("JMS_Solace_HTTP_target_path_query_verbatim"));
+                        replyMsg.setText("Your path was: "+requestMsg.getProperties().getString("JMS_Solace_HTTP_target_path_query_verbatim"));
                     } catch (Exception e) {
-                        reply.setText(text);
+                        replyMsg.setText(text);
                     }
-                    System.out.println(request.dump());  // prints the request message to the console
-                    reply.setApplicationMessageId(request.getApplicationMessageId());  // needed for correlation
-                    System.out.println(reply.dump());
+                    System.out.println(requestMsg.dump());  // prints the request message to the console
+                    //reply.setApplicationMessageId(request.getApplicationMessageId());  // needed for correlation
+                    replyMsg.setCorrelationId(requestMsg.getApplicationMessageId());  // needed for correlation
+                    replyMsg.setCorrelationId("blah-this-gets-deleted");  // needed for correlation
+                    System.out.println(replyMsg.dump());
                     try {
-                        producer.sendReply(request, reply);
+                        producer.sendReply(requestMsg, replyMsg);
                     } catch (JCSMPException e) {
                         System.out.println("Error sending reply.");
                         e.printStackTrace();
@@ -108,6 +112,11 @@ public class DirectReplier {
             }
         });
 
+        // topic to listen to incoming (messaging) requests
+        final Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request");
+        // for use with HTTP MicroGateway feature, will respond to GET request on same URI
+        final Topic topic2 = JCSMPFactory.onlyInstance().createTopic("GET/"+TOPIC_PREFIX+"/direct/request");
+        
         session.addSubscription(topic);
         session.addSubscription(topic2);
         cons.start();

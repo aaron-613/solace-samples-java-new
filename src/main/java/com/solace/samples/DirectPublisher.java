@@ -123,12 +123,15 @@ public class DirectPublisher {
                     try {
 //                        Thread.sleep(0);
                         Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
-                        // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k max ingress
+                        // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;
                     }
                 } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
                     System.out.printf("### Caught while trying to producer.send(): %s%n",e);
+                    if (e instanceof JCSMPTransportException) {  // unrecoverable
+                        isShutdown = true;
+                    }
                 }
             }
         };
@@ -146,7 +149,6 @@ public class DirectPublisher {
         System.out.println("Quitting in 1 second.");
         isShutdown = true;
         Thread.sleep(1000);
-        producer.close();
-        session.closeSession();
+        session.closeSession();  // will also close producer and consumer objects
     }
 }

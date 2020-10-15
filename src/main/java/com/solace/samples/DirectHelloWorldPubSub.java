@@ -19,8 +19,8 @@
 
 package com.solace.samples;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.Scanner;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
@@ -34,6 +34,8 @@ import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+
+import java.io.InputStreamReader;
 
 /**
  * This simple introductory sample shows an application that both publishes and subscribes.
@@ -60,9 +62,10 @@ public class DirectHelloWorldPubSub {
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(10);  // give more time to reconnect
+        channelProps.setConnectRetriesPerHost(2);
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
-        System.out.print("Connecting... ");
+        System.out.println("Connecting... ");
         session.connect();  // connect to the broker
         System.out.println("Connected.");
         
@@ -111,20 +114,20 @@ public class DirectHelloWorldPubSub {
         });
         
         // User prompt, to use for specific topic
-        System.out.print("Enter your name, or a unique word: ");
-        Scanner userInputScanner = new Scanner(System.in);
-        String uniqueName = userInputScanner.next().trim().replaceAll("\\s+", "_");  // clean up whitespace
-        userInputScanner.close();
+        System.out.printf("%nEnter your name, or a unique word: ");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
         
         // Ready to start the application
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/hello/>"));  // use wildcards
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/hello/>"));    // use wildcards
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
-        System.out.println("Connected and subscribed. Ready to publish.");
+        System.out.printf("%nConnected and subscribed. Ready to publish. Press [ENTER] to quit.%n");
+        System.out.printf("  Run this sample twice to see true publish-subscribe%n%n");
 
         int msgSeqNum = 0;
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        while (!isShutdown) {  // time to loop!
+        while (System.in.available() == 0 && !isShutdown) {  // time to loop!
             try {
                 msgSeqNum++;
             	// specify a text payload
@@ -146,6 +149,8 @@ public class DirectHelloWorldPubSub {
 	        }
         }
         System.out.println("Main thread quitting.");
-        session.closeSession();  // quit right away
+        isShutdown = true;
+        Thread.sleep(1000);
+        session.closeSession();  // will also close producer and consumer objects
     }
 }
