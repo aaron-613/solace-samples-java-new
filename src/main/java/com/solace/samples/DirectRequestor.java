@@ -19,6 +19,8 @@
 
 package com.solace.samples;
 
+import java.io.IOException;
+
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -27,6 +29,7 @@ import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPRequestTimeoutException;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
+import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.Requestor;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.Topic;
@@ -34,16 +37,25 @@ import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
+/** Direct Messaging sample to demonstrate initiating a request-reply flow.
+ *  Makes use of the blocking convenience function Requestor.request(
+ */
 public class DirectRequestor {
+    
+    private static final String SAMPLE_NAME = DirectRequestor.class.getSimpleName();
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final int APPROX_MSG_RATE_PER_SEC = 1;
 
-    public static void main(String... args) throws JCSMPException {
-        // Check command line arguments
-        if (args.length < 3) {
+    private static volatile boolean isShutdown = false;
+
+
+    public static void main(String... args) throws JCSMPException, IOException {
+        if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    DirectRequestor.class.getSimpleName());
+                    SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println("DirectRequestor initializing...");
+        System.out.println(SAMPLE_NAME+" initializing...");
 
         // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
@@ -62,33 +74,47 @@ public class DirectRequestor {
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
 
-        //This will have the session create the producer and consumer required
-        //by the Requestor used below.
-
         /** Anonymous inner-class for handling publishing events */
         @SuppressWarnings("unused")
         XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-            @Override
+            @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
-                // unused, deprecated and superseded
+                // deprecated, superseded by responseReceivedEx()
             }
-            @Override
+            @Override @SuppressWarnings("deprecation")
             public void handleError(String messageID, JCSMPException e, long timestamp) {
-                // unused, deprecated and superseded
+                // deprecated, superseded by handleErrorEx()
             }
-            @Override
-            public void responseReceivedEx(Object key) {
-                System.out.println("Producer received response for msg: " + key);
+            @Override public void responseReceivedEx(Object key) {
+                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
+            // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-                System.out.printf("Producer received error for msg: %s@%s - %s%n",
-                        key,timestamp,cause);                
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdown = true;
+                }
             }
-        });  // null is the ProducerEvent handler... do not need it in this simple application
+        });
 
-        XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);
-        consumer.start();
+//        XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);  // rare use of synchronous consumer mode
+        XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
+            
+            @Override
+            public void onReceive(BytesXMLMessage message) {
+                System.out.println("Received a message!");
+            }
+            
+            @Override
+            public void onException(JCSMPException e) {
+                System.out.printf("### MessageListener's onException(): %s%n",e);
+                if (e instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdown = true;
+                }
+            }
+        });
+        consumer.start();  // needed to accept the responses
 
         //Time to wait for a reply before timing out
         final int timeoutMs = 10000;
@@ -97,23 +123,24 @@ public class DirectRequestor {
         //request.setText(text);
 
         try {
-            Requestor requestor = session.createRequestor();  // create the Requestor object
-            Topic topic = JCSMPFactory.onlyInstance().createTopic("solace/samples/direct/request");
-            System.out.printf("Connected. About to send request message '%s' to topic '%s'...%n",text,topic.getName());
-            // perform blocking/synchronous call using convenience method request()
-            BytesXMLMessage reply = requestor.request(requestMsg, timeoutMs, topic);
-
-            // Process the reply
-            if (reply instanceof TextMessage) {
-                System.out.printf("TextMessage response received: '%s'%n",
-                        ((TextMessage)reply).getText());
+            while (System.in.available() == 0 && !isShutdown) {
+                try {
+                    Requestor requestor = session.createRequestor();  // create the Requestor object
+                    Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request");
+                    System.out.printf("About to send request message '%s' to topic '%s'...%n",text,topic.getName());
+                    // perform blocking/synchronous call using convenience method request()
+                    BytesXMLMessage reply = requestor.request(requestMsg, timeoutMs, topic);
+                    System.out.printf("Response Message Dump:%n%s%n",reply.dump());
+                    Thread.sleep(APPROX_MSG_RATE_PER_SEC/1000);
+                } catch (JCSMPRequestTimeoutException e) {
+                    System.out.println("Failed to receive a reply in " + timeoutMs + " msecs");
+                } catch (InterruptedException e1) {
+                    isShutdown = true;
+                }
             }
-            System.out.printf("Response Message Dump:%n%s%n",reply.dump());
-        } catch (JCSMPRequestTimeoutException e) {
-            System.out.println("Failed to receive a reply in " + timeoutMs + " msecs");
+        } finally {
+            System.out.println("Exiting...");
+            session.closeSession();
         }
-
-        System.out.println("Exiting...");
-        session.closeSession();
     }
 }

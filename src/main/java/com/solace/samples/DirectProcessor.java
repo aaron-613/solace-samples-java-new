@@ -22,6 +22,7 @@ package com.solace.samples;
 import java.io.IOException;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
@@ -35,16 +36,25 @@ import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 /**
- * A Processor is a microservice/application that receives a message, does something with the info,
- * and then sends it on..!
+ * A Processor is a microservice or application that receives a message, does something with the info,
+ * and then sends it on..!  It is both a publisher and a subscriber, but (mainly) publishes data once
+ * it has received an input message.
  */
 public class DirectProcessor {
 
+    private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    
+    private static boolean isShutdown = false;
 
-    public void run(String... args) throws JCSMPException {
-        System.out.println(DirectProcessor.class.getSimpleName()+" initializing...");
-        
+    public static void main(String... args) throws JCSMPException, IOException {
+        if (args.length < 3) {  // Check command line arguments
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    SAMPLE_NAME);
+            System.exit(-1);
+        }
+        System.out.println(SAMPLE_NAME+" initializing...");
+
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
@@ -52,6 +62,7 @@ public class DirectProcessor {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
+        properties.setProperty(JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR,true);
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
@@ -78,7 +89,7 @@ public class DirectProcessor {
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
-
+                    isShutdown = false;
                 }
             }
         });
@@ -87,7 +98,7 @@ public class DirectProcessor {
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage inboundMsg) {
-                if (inboundMsg.getReplyTo() == null) {  // not expecting reply
+                if (inboundMsg.getDestination().getName().startsWith(TOPIC_PREFIX+"/direct/pub")) {
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
                     // how to process the incoming message? maybe do a DB lookup? or add some payload
                     final String upperCaseMessage = inboundMsg.dump().toUpperCase();  // as an example of "processing"
@@ -95,6 +106,8 @@ public class DirectProcessor {
                     if (!inboundMsg.getApplicationMessageId().isEmpty()) outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());
                     String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundMsg.getDestination().getName()).toString();//.charAt(index)toUpperCase();
                     try {
+                        // only allowed to publish Direct messages from API-owned (callback) thread
+                        outboundMsg.setDeliveryMode(DeliveryMode.PERSISTENT);
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                     } catch (JCSMPException e) {
                         System.out.println("### Error sending reply.");
@@ -113,31 +126,22 @@ public class DirectProcessor {
 
         session.connect();
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/pub/>"));  // listen to
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));
         cons.start();
 
         // Consume-only session is now hooked up and running!
         System.out.println("Listening for incoming messages. Press [ENTER] to exit");
-        try {
-            System.in.read();
-        } catch (IOException e) {
-            e.printStackTrace();
+        while (System.in.available() == 0 && !isShutdown) {  // time to loop!
+            try {
+                Thread.sleep(1000);  // take a pause
+            } catch (InterruptedException e) {
+                
+            }
         }
-
         // Close consumer
         cons.close();
         System.out.println("Exiting.");
         session.closeSession();
 
-    }
-
-    public static void main(String... args) throws JCSMPException {
-        // Check command line arguments
-        if (args.length < 3) {
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    DirectProcessor.class.getSimpleName());
-            System.exit(-1);
-        }
-        DirectProcessor processor = new DirectProcessor();
-        processor.run(args);
     }
 }

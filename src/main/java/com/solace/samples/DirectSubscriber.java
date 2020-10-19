@@ -114,14 +114,11 @@ public class DirectSubscriber {
                 if (e instanceof JCSMPTransportException) {  // pretty bad, not recoverable
                 	// means that all the reconnection attempts have failed
                 	isShutdown = true;  // let's quit
-                } else if (e instanceof JCSMPErrorResponseException) {  // might have some extra info
-                    JCSMPErrorResponseException e1 = (JCSMPErrorResponseException)e;
-                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e1.getSubcodeEx())+": "+e1.getResponsePhrase());
                 }
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/>"));//direct/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/>"));
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // add multiple wildcard subscriptions
         consumer.start();
         System.out.println("Connected, and running...");

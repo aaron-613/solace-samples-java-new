@@ -36,11 +36,20 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectReplier {
 
+    private static final String SAMPLE_NAME = DirectReplier.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
-    
-    public void run(String... args) throws JCSMPException {
-        System.out.println("DirectReplier initializing...");
+    private static volatile boolean isShutdown = false;
+
+    public static void main(String... args) throws JCSMPException {
+        // Check command line arguments
+        if (args.length < 3) {
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    SAMPLE_NAME);
+            System.exit(-1);
+        }
+
+        System.out.println(SAMPLE_NAME+" initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
@@ -76,27 +85,16 @@ public class DirectReplier {
             public void onReceive(BytesXMLMessage requestMsg) {
                 // we will reply from within the callback, only allows for Direct messages
                 
-                if (requestMsg.getReplyTo() != null) {
-                    System.out.println("Received request, generating response");
-                    TextMessage replyMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-                    if (!requestMsg.getApplicationMessageId().isEmpty()) {
-                        replyMsg.setApplicationMessageId(requestMsg.getApplicationMessageId());
+                if (requestMsg.getDestination().getName().contains("direct/request") && requestMsg.getReplyTo() != null) {
+                    System.out.printf("Received request on '%s', generating response.",requestMsg.getDestination());
+                    TextMessage replyMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);  // reply with a Text
+                    if (requestMsg.getApplicationMessageId() != null) {
+                        replyMsg.setApplicationMessageId(requestMsg.getApplicationMessageId());  // populate for traceability
                     }
-
-                    final String text = "Sample response";
-                    //reply.setText(text);
+                    final String text = "Hello! Here is a response to your message on topic '"+requestMsg.getDestination()+"'.";
+                    replyMsg.setText(text);
                     try {
-                        replyMsg.setText("Your path was: "+requestMsg.getProperties().getString("JMS_Solace_HTTP_target_path_query_verbatim"));
-                    } catch (Exception e) {
-                        replyMsg.setText(text);
-                    }
-                    System.out.println(requestMsg.dump());  // prints the request message to the console
-                    //reply.setApplicationMessageId(request.getApplicationMessageId());  // needed for correlation
-                    replyMsg.setCorrelationId(requestMsg.getApplicationMessageId());  // needed for correlation
-                    replyMsg.setCorrelationId("blah-this-gets-deleted");  // needed for correlation
-                    System.out.println(replyMsg.dump());
-                    try {
-                        producer.sendReply(requestMsg, replyMsg);
+                        producer.sendReply(requestMsg, replyMsg);  // convenience method: copies in reply-to, correlationId, etc.
                     } catch (JCSMPException e) {
                         System.out.println("Error sending reply.");
                         e.printStackTrace();
@@ -113,12 +111,13 @@ public class DirectReplier {
         });
 
         // topic to listen to incoming (messaging) requests
-        final Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request");
+        final Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request\u0003");
         // for use with HTTP MicroGateway feature, will respond to GET request on same URI
-        final Topic topic2 = JCSMPFactory.onlyInstance().createTopic("GET/"+TOPIC_PREFIX+"/direct/request");
+        final Topic topic2 = JCSMPFactory.onlyInstance().createTopic("GET/"+TOPIC_PREFIX+"/direct/request/\u0003");
         
         session.addSubscription(topic);
         session.addSubscription(topic2);
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // add multiple wildcard subscriptions
         cons.start();
 
         // Consume-only session is now hooked up and running!
@@ -134,18 +133,5 @@ public class DirectReplier {
         System.out.println("Exiting.");
         session.closeSession();
 
-    }
-
-    public static void main(String... args) throws JCSMPException {
-
-        // Check command line arguments
-        if (args.length < 3) {
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    DirectReplier.class.getSimpleName());
-            System.exit(-1);
-        }
-
-        DirectReplier replier = new DirectReplier();
-        replier.run(args);
     }
 }

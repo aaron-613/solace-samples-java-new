@@ -25,35 +25,33 @@ import java.util.UUID;
 
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
-import com.solacesystems.jcsmp.JCSMPErrorResponseException;
-import com.solacesystems.jcsmp.JCSMPErrorResponseSubcodeEx;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
-import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class DirectPublisher {
     
+	private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int APPROX_MSG_RATE_PER_SEC = 100;
+    private static final int APPROX_MSG_RATE_PER_SEC = 1;
     private static final int PAYLOAD_SIZE = 100;
+	
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
-        // Check command line arguments
-        if (args.length < 3) {
+        if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    DirectPublisher.class.getSimpleName());
+                    SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(DirectPublisher.class.getSimpleName()+" initializing...");
+        System.out.println(SAMPLE_NAME+" initializing...");
 
         // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
@@ -96,30 +94,22 @@ public class DirectPublisher {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
                     isShutdown = true;
-                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
-                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
-                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
                 }
             }
-        },null);  // null is the ProducerEvent handler... do not need it in this simple application 
+        }); 
         // done boilerplate
         
         Runnable pubThread = () -> {  // create an application thread for publishing in a loop
-            String topicString;
             BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);  // preallocate a binary message
             byte[] payload = new byte[PAYLOAD_SIZE];  // preallocate, for reuse
             while (!isShutdown) {
                 try {
-                    // each loop, make a new payload to send
+                    // each loop, change the payload
                     char chosenCharacter = (char)(Math.round(System.nanoTime()%26)+65);  // choose a "random" letter [A-Z]
                     Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
                     message.setData(payload);
-                    // user property!
-                    SDTMap map = JCSMPFactory.onlyInstance().createMap();
-                    map.putString("this is a test","hello world");
-                    message.setProperties(map);
                     // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
-                    topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/pub/").append(chosenCharacter).toString();
+                    String topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/pub/").append(chosenCharacter).toString();
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one

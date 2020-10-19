@@ -42,24 +42,18 @@ import java.io.InputStreamReader;
  */
 public class DirectHelloWorldPubSub {
     
+	private static final String SAMPLE_NAME = DirectHelloWorldPubSub.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static volatile boolean isShutdown = false;      // are we done yet?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    DirectHelloWorldPubSub.class.getSimpleName());
+                    SAMPLE_NAME);
             System.exit(-1);
         }
-        
-        // User prompt, to use for specific topic
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String uniqueName = "";
-        while (uniqueName.isEmpty()) {
-            System.out.printf("Enter your name, or a unique word: ");
-            uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
-        }
-        
+        System.out.println(SAMPLE_NAME+" initializing...");
+		
         // Build the properties object for initializing the Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);
@@ -97,7 +91,7 @@ public class DirectHelloWorldPubSub {
                     isShutdown = true;
                 }
             }
-        }, null);  // null is the ProducerEvent handler... do not need it in this simple application
+        });
 
         // setup Consumer callbacks next: anonymous inner-class for Listener async threaded callbacks
         final XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
@@ -119,6 +113,14 @@ public class DirectHelloWorldPubSub {
                 }
             }
         });
+
+        // User prompt, to use for specific topic
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String uniqueName = "";
+        while (uniqueName.isEmpty()) {
+            System.out.printf("Enter your name, or a unique word: ");
+            uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
+        }
         
         // Ready to start the application
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/hello/>"));    // use wildcards
@@ -131,7 +133,6 @@ public class DirectHelloWorldPubSub {
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
             try {
-                Thread.sleep(5000);  // take a pause
                 msgSeqNum++;
             	// specify a text payload
                 message.setText(String.format("Hello World #%d from %s!", msgSeqNum,uniqueName));
@@ -141,6 +142,7 @@ public class DirectHelloWorldPubSub {
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum,topicString);
                 producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it
+                Thread.sleep(5000);  // take a pause
 	        } catch (JCSMPException e) {
 	            System.out.printf("### Exception caught during publish(): %s%n",e);
 	            if (e instanceof JCSMPTransportException) {  // unrecoverable
