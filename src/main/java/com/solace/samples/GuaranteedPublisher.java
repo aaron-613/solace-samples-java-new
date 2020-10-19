@@ -122,6 +122,8 @@ public class GuaranteedPublisher {
         @Override
         public void responseReceivedEx(Object key) {
 //          System.out.printf("%s   ACK %d START: %s%n",getTs(),((MessageInfo)key).myUniqueId,key);
+          logger.info(String.format("   ACK %d START: %s%n",((MessageAckInfo)key).myUniqueId,key));
+
             assert key != null;  // this shouldn't happen, this should only get called for an ACK
             try {
                 MessageAckInfo cKey = messagesAwaitingAcksRingBuffer.remove();  // will throw an exception if it's empty, should be impossible
@@ -202,7 +204,7 @@ public class GuaranteedPublisher {
         Runnable pubThread = new Runnable() {
             @Override
             public void run() {
-                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/pers/"+"");
+                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/pers/"+"asdf");
                 byte[] payload = new byte[PAYLOAD_SIZE];
                 try {
                     while (!isShutdown) {

@@ -31,6 +31,8 @@ import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.Requestor;
+import com.solacesystems.jcsmp.SessionEventArgs;
+import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
@@ -47,7 +49,6 @@ public class DirectRequestor {
     private static final int APPROX_MSG_RATE_PER_SEC = 1;
 
     private static volatile boolean isShutdown = false;
-
 
     public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
@@ -71,7 +72,12 @@ public class DirectRequestor {
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
+        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+            @Override
+            public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
+                System.out.printf("### Received a Session event: %s%n",event);
+            }
+        });
         session.connect();
 
         /** Anonymous inner-class for handling publishing events */
@@ -103,7 +109,7 @@ public class DirectRequestor {
             
             @Override
             public void onReceive(BytesXMLMessage message) {
-                System.out.println("Received a message!");
+                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",message.dump());  // just print
             }
             
             @Override
@@ -134,13 +140,16 @@ public class DirectRequestor {
                     Thread.sleep(APPROX_MSG_RATE_PER_SEC/1000);
                 } catch (JCSMPRequestTimeoutException e) {
                     System.out.println("Failed to receive a reply in " + timeoutMs + " msecs");
+                } catch (JCSMPException e) {
+                    
                 } catch (InterruptedException e1) {
-                    isShutdown = true;
+                    // Thread.sleep interrupted... probably getting shut down
                 }
             }
         } finally {
-            System.out.println("Exiting...");
-            session.closeSession();
+            System.out.println("Main thread quitting.");
+            isShutdown = true;
+            session.closeSession();  // will also close producer and consumer objects
         }
     }
 }

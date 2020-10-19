@@ -30,6 +30,8 @@ import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
+import com.solacesystems.jcsmp.SessionEventArgs;
+import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
@@ -69,7 +71,13 @@ public class DirectProcessor {
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
+        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+            @Override
+            public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
+                System.out.printf("### Received a Session event: %s%n",event);
+            }
+        });
+        session.connect();
 
         /** Simple anonymous inner-class for handling publishing events */
         final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
@@ -99,14 +107,18 @@ public class DirectProcessor {
             @Override
             public void onReceive(BytesXMLMessage inboundMsg) {
                 if (inboundMsg.getDestination().getName().startsWith(TOPIC_PREFIX+"/direct/pub")) {
+                    // how to process the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-                    // how to process the incoming message? maybe do a DB lookup? or add some payload
-                    final String upperCaseMessage = inboundMsg.dump().toUpperCase();  // as an example of "processing"
+                    final String upperCaseMessage = inboundMsg.dump().toUpperCase();  // as a silly example of "processing"
                     outboundMsg.setText(upperCaseMessage);
-                    if (!inboundMsg.getApplicationMessageId().isEmpty()) outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());
-                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundMsg.getDestination().getName()).toString();//.charAt(index)toUpperCase();
+                    if (inboundMsg.getApplicationMessageId() != null) {
+                        outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
+                    }
+                    String [] inboundTopicLevels = inboundMsg.getDestination().getName().split("/");
+                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundTopicLevels[4]).toString();
                     try {
-                        // only allowed to publish Direct messages from API-owned (callback) thread
+                        // only allowed to publish messages from API-owned (callback) thread when JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR == false
+                        
                         outboundMsg.setDeliveryMode(DeliveryMode.PERSISTENT);
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                     } catch (JCSMPException e) {
@@ -124,7 +136,6 @@ public class DirectProcessor {
             }
         });
 
-        session.connect();
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/pub/>"));  // listen to
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));
         cons.start();
@@ -138,10 +149,8 @@ public class DirectProcessor {
                 
             }
         }
-        // Close consumer
-        cons.close();
-        System.out.println("Exiting.");
-        session.closeSession();
-
+        System.out.println("Main thread quitting.");
+        isShutdown = true;
+        session.closeSession();  // will also close producer and consumer objects
     }
 }

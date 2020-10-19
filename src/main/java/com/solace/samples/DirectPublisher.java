@@ -35,11 +35,14 @@ import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
+/**
+ * A more performant sample that shows an application that publishes.
+ */
 public class DirectPublisher {
     
 	private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int APPROX_MSG_RATE_PER_SEC = 1;
+    private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 100;
 	
     private static volatile int msgSentCounter = 0;                   // num messages sent
@@ -53,7 +56,7 @@ public class DirectPublisher {
         }
         System.out.println(SAMPLE_NAME+" initializing...");
 
-        // Create a JCSMP Session
+        // Build the properties object for initializing the JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
@@ -63,14 +66,14 @@ public class DirectPublisher {
         }
         properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS,true);  // why not?
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
-//        channelProps.setReconnectRetries(20);      // recommended settings
-//        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
             @Override
-            public void handleEvent(SessionEventArgs event) {
-                System.out.printf("### SessionEventHandler handleEvent() callback: %s%n",event);
+            public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
+                System.out.printf("### Received a Session event: %s%n",event);
             }
         });
         session.connect();
@@ -96,8 +99,7 @@ public class DirectPublisher {
                     isShutdown = true;
                 }
             }
-        }); 
-        // done boilerplate
+        });
         
         Runnable pubThread = () -> {  // create an application thread for publishing in a loop
             BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);  // preallocate a binary message
@@ -140,9 +142,8 @@ public class DirectPublisher {
             System.out.printf("Published msgs/s: %,d%n",msgSentCounter);  // simple way of calculating message rates
             msgSentCounter = 0;
         }
-        System.out.println("Quitting in 1 second.");
+        System.out.println("Main thread quitting.");
         isShutdown = true;
-        Thread.sleep(1000);
-        session.closeSession();  // will also close producer and consumer objects
+        session.closeSession();  // will also close producer object
     }
 }

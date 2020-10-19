@@ -54,20 +54,19 @@ public class DirectHelloWorldPubSub {
         }
         System.out.println(SAMPLE_NAME+" initializing...");
 		
-        // Build the properties object for initializing the Session
+        // Build the properties object for initializing the JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]);
+        properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
         if (args.length > 3) {
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(10);  // give more time to reconnect
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
-        System.out.println("%nConnecting... ");
         session.connect();  // connect to the broker
         
         // setup Producer callbacks config: simple anonymous inner-class for handling publishing events
@@ -96,10 +95,10 @@ public class DirectHelloWorldPubSub {
         // setup Consumer callbacks next: anonymous inner-class for Listener async threaded callbacks
         final XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
             @Override
-            public void onReceive(BytesXMLMessage msg) {
+            public void onReceive(BytesXMLMessage message) {
                 // could be 4 different message types: 3 SMF ones (Text, Map, Stream) and just plain binary
-                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",msg.dump());  // just print
-                if (msg.getDestination().getName().contains("quit")) {  // special sample message
+                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",message.dump());  // just print
+                if (message.getDestination().getName().contains("quit")) {  // special sample message
                     System.out.println("QUIT message received, shutting down.");
                     isShutdown = true;
                 }
@@ -149,12 +148,11 @@ public class DirectHelloWorldPubSub {
 	                isShutdown = true;
 	            }
 	        } catch (InterruptedException e) {
-	            // IGNORE... probably getting shut down
+	            // Thread.sleep() interrupted... probably getting shut down
 	        }
         }
         System.out.println("Main thread quitting.");
         isShutdown = true;
-        Thread.sleep(1000);
         session.closeSession();  // will also close producer and consumer objects
     }
 }
