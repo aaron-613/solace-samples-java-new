@@ -39,6 +39,7 @@ import com.solacesystems.jcsmp.XMLMessageListener;
  */
 public class DirectSubscriber {
 
+    private static final String SAMPLE_NAME = DirectSubscriber.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
     private static boolean VERIFY_PAYLOAD_DATA = true;            // should we do some "processing" of incoming messages? (just for example)
@@ -47,12 +48,12 @@ public class DirectSubscriber {
     private static volatile boolean isShutdown = false;          // are we done?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
-        // Check command line arguments
-        if (args.length < 3) {
+        if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    DirectSubscriber.class.getSimpleName());
+                    SAMPLE_NAME);
             System.exit(-1);
         }
+        System.out.println(SAMPLE_NAME+" initializing...");
 
         System.out.println(DirectSubscriber.class.getSimpleName()+" initializing...");
         final JCSMPProperties properties = new JCSMPProperties();

@@ -19,7 +19,7 @@
 
 package com.solace.samples;
 
-import java.util.concurrent.CountDownLatch;
+import java.io.IOException;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
@@ -36,18 +36,21 @@ import com.solacesystems.jcsmp.XMLMessageListener;
 
 public class GuaranteedSubscriber {
     
-    public static final String QUEUE_NAME = "q_samples";
+    private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
+    private static final String QUEUE_NAME = "q_samples";
+    
+    private static volatile int msgRecvCounter = 0;                   // num messages received
+    private static volatile boolean isShutdown = false;          // are we done?
 
-    public static void main(String... args) throws JCSMPException, InterruptedException {
-        // Check command line arguments
-        if (args.length < 3) {
-            System.out.println("Usage: GuaranteedSubscriber <host:port> <message-vpn> <client-username> [client-password]");
-            System.out.println();
+
+    public static void main(String... args) throws JCSMPException, InterruptedException, IOException {
+        if (args.length < 3) {  // Check command line arguments
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
+                    SAMPLE_NAME);
             System.exit(-1);
         }
+        System.out.println(SAMPLE_NAME+" initializing...");
 
-        System.out.println("GuaranteedSubscriber initializing...");
-        // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
         properties.setProperty(JCSMPProperties.USERNAME, args[1]); // client-username
@@ -68,7 +71,6 @@ public class GuaranteedSubscriber {
         // Actually provision it, and do not fail if it already exists
         //session.provision(queue, endpointProps, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
 
-        final CountDownLatch latch = new CountDownLatch(1); // used for synchronizing b/w threads
 
         System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
 
@@ -85,7 +87,7 @@ public class GuaranteedSubscriber {
             flowQueueReceiver = session.createFlow(new XMLMessageListener() {
                 @Override
                 public void onReceive(BytesXMLMessage msg) {
-                    System.out.printf("Message Dump:%n%s%n", msg.dump());
+                    msgRecvCounter++;
     
                     // When the ack mode is set to SUPPORTED_MESSAGE_ACK_CLIENT,
                     // guaranteed delivery messages are acknowledged after
@@ -112,13 +114,18 @@ public class GuaranteedSubscriber {
         flowQueueReceiver.start();
 
         try {
-            latch.await(); // block here until message received, and latch will flip
+            while (System.in.available() == 0 && !isShutdown) {
+                Thread.sleep(1000);  // wait 1 second
+                System.out.printf("Received msgs/s: %,d%n",msgRecvCounter);  // simple way of calculating message rates
+                msgRecvCounter = 0;
+            }
         } catch (InterruptedException e) {
-            System.out.println("I was awoken while waiting");
+            // Thread.sleep() interrupted... probably getting shut down
         }
-        // Close consumer
-        flowQueueReceiver.close();
-        System.out.println("Exiting.");
-        session.closeSession();
+        System.out.println("Main thread quitting.");
+        isShutdown = true;
+        flowQueueReceiver.stop();
+        Thread.sleep(1000);
+        session.closeSession();  // will also close consumer object
     }
 }
