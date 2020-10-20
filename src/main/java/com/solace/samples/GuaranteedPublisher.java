@@ -30,6 +30,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.solacesystems.jcsmp.BytesMessage;
+import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPErrorResponseException;
@@ -44,6 +45,8 @@ import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.ProducerEventArgs;
 import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
+import com.solacesystems.jcsmp.XMLMessageConsumer;
+import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class GuaranteedPublisher {
@@ -95,7 +98,8 @@ public class GuaranteedPublisher {
         
         @Override
         public String toString() {
-            return String.format("MsgID: %d %s -- %s",id,ackStatus,message.toString());
+//            return String.format("MsgID: %d %s -- %s",id,ackStatus,message.toString());
+            return String.format("MsgID: %d %s",id,ackStatus);
         }
     }
     // END HELPER CLASS //////////////////////////////////////////////////////////
@@ -159,15 +163,13 @@ public class GuaranteedPublisher {
     
     private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int PUBLISH_WINDOW_SIZE = 8;
+    
+    private static final int PUBLISH_WINDOW_SIZE = 5;
     private static final Logger logger = LogManager.getLogger(GuaranteedPublisher.class);
 
-    private static final ArrayBlockingQueue<MessageAckInfo> messagesAwaitingAcksRingBuffer = new ArrayBlockingQueue<>(10000);
+    private static final ArrayBlockingQueue<MessageAckInfo> messagesAwaitingAcksRingBuffer = new ArrayBlockingQueue<>(110000);
     private static volatile boolean isShutdown = false;
     
-
-    
-
     
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
@@ -185,7 +187,6 @@ public class GuaranteedPublisher {
         if (args.length > 3) { 
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
-        properties.setProperty(JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR,true);
         properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,PUBLISH_WINDOW_SIZE);
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
@@ -221,17 +222,18 @@ public class GuaranteedPublisher {
                         message.setDeliveryMode(DeliveryMode.PERSISTENT);
                         message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
                         // let's define a user property!
-                        SDTMap map = JCSMPFactory.onlyInstance().createMap();
-                        map.putString("sample","JCSMP GuaranteedPublisher");
-                        message.setProperties(map);
+//                        SDTMap map = JCSMPFactory.onlyInstance().createMap();
+//                        map.putString("sample","JCSMP GuaranteedPublisher");
+//                        message.setProperties(map);
                         MessageAckInfo key = new MessageAckInfo(message);  // make a new structure for watching this message
                         message.setCorrelationKey(key);  // used for ACK/NACK correlation
+                        //message.setAckImmediately(true);
                         try {
                             messagesAwaitingAcksRingBuffer.put(key);  // NEED NEED NEED to add it before the send() in case of race condition and the ACK comes back before it's added to the list
                             logger.info(String.format("           SEND %d START: %s",key.id,key));
                             producer.send(message,topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
-                            logger.info(String.format("           SEND %d END:   %s",key.id,key));
-                            Thread.sleep(000);
+                            //logger.info(String.format("           SEND %d END:   %s",key.id,key));
+                            Thread.sleep(0);
                             //Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                             // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                         } catch (InterruptedException e) {
