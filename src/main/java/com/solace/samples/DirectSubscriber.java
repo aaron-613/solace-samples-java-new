@@ -55,7 +55,6 @@ public class DirectSubscriber {
         }
         System.out.println(SAMPLE_NAME+" initializing...");
 
-        System.out.println(DirectSubscriber.class.getSimpleName()+" initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
