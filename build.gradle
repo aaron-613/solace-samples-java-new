@@ -99,6 +99,7 @@ scripts.each() { scriptName, className ->
         applicationName = scriptName
         outputDir = new File(project.buildDir, 'scripts')
         classpath = jar.outputs.files + project.configurations.runtimeClasspath
+        defaultJvmOpts = ['-ea']
     }
     applicationDistribution.into("bin") {
         from(t)
