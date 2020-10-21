@@ -3,20 +3,21 @@
 These few samples are the starting point of the proposed way of presenting Solace samples.
 
 
-## Basics
+## Fundamentals
 
  - HelloWorld (Direct) Pub/Sub
  - Direct
     - Publish-Subscribe
     - Processor
     - Request-Reply
+    - Proxy (?)
  - Guaranteed
     - Publish-Subscribe
     - Processor
     - Request-Reply
 
 
-## The Features
+## Features (broker or API)
 
  - Message Replay (API Initiated)
  - Active Flow Consumer Indication
@@ -34,3 +35,7 @@ These few samples are the starting point of the proposed way of presenting Solac
  - Topic Endpoints
  - PubSub+ Cache
 
+## Patterns
+
+ - Delayed Delivery
+ - ?
