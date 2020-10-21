@@ -4,7 +4,7 @@ These few samples are the starting point of the proposed way of presenting Solac
 
 
 ## Fundamentals
-
+These will be proper little messaging applications, looping, publishing multiple messages, using subscriptions w/wildcards, and at least logging or echoing errors and API events to the console.
  - HelloWorld (Direct) Pub/Sub
  - Direct
     - Publish-Subscribe
@@ -19,19 +19,26 @@ These few samples are the starting point of the proposed way of presenting Solac
 
 ## Features (broker or API)
 
+These will be mostly the exising samples. Maybe they need to be tweaked? But also considering just using snippets for these, especially API features.
+
  - Message Replay (API Initiated)
  - Active Flow Consumer Indication
  - Time-To-Live Message Expiry, and Dead Message Queues
  - Last Value Queues
  - Dynamically created/provision Queues
 
+### API
+ - How to read create additional Contexts
+ - How to do a blocking consumer
+ - ?? 
 
 ## The Extras
+
+Less common or less important Features?  Perhaps these should be under Features too?
 
  - Session Transactions
  - Browsing Queues
  - Message Selectors
- - Delayed Delivery
  - Topic Endpoints
  - PubSub+ Cache
 
