@@ -116,27 +116,27 @@ public class TestEveryMessageSetting {
         msg.setCorrelationId("msg.setCorrelationId()");
         msg.setCorrelationKey(msg);
         msg.setCos(User_Cos.USER_COS_2);  // why not
-        msg.setDeliverToOne(true);  // old school
+        msg.setDeliverToOne(true);  // old school, deprecated now in favour of Shared Subscriptions
         msg.setDeliveryMode(DeliveryMode.DIRECT);
         msg.setDMQEligible(true);
         msg.setElidingEligible(true);
         msg.setExpiration(System.currentTimeMillis()+(1000*60*60*24));
         msg.setHTTPContentEncoding("msg.setHTTPContentEncoding()");
         msg.setHTTPContentType("msg.setHTTPContentType");
-        msg.setPriority(99);
+        msg.setPriority(254);
         msg.setReplyTo(JCSMPFactory.onlyInstance().createTopic("msg.setReplyTo()"));
         msg.setReplyToSuffix("msg.setReplyToSuffix()");  // overwrites previous reply-to with inbox topic
+
         msg.setSenderId("msg.setSenderId()");
         msg.setSenderTimestamp(System.currentTimeMillis());
-        msg.setSequenceNumber(12345);
+        msg.setSequenceNumber(123456789);
         msg.setTimeToLive(1000*60);  // milliseconds
-        //msg.writeAttachment("msg.writeAttachment()".getBytes(UTF_8));  // binary payload, overwrites TextMsg body
+        msg.writeAttachment("msg.writeAttachment()".getBytes(UTF_8));  // binary payload, overwrites TextMsg body
         msg.writeBytes("msg.writeBytes()".getBytes(UTF_8));  // XML payload, don't use this, just a test
         System.out.println("Sending FULL Direct Text Message");
         System.out.println(msg.dump());
-        prod.send(msg,JCSMPFactory.onlyInstance().createTopic("test/direct"));
+        prod.send(msg,JCSMPFactory.onlyInstance().createTopic("solace/samples/test/all"));
         Thread.sleep(1000);
-System.exit(-1);
         
         // TEST 2
         final String queueName = "q/test";
@@ -162,7 +162,8 @@ System.exit(-1);
         final FlowReceiver flow = session.createFlow(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage msg) {
-                System.out.printf("================%nMESSAGE #%d ON MY QUEUE RECEIVED:%n%s%n",queueMessages.incrementAndGet(), msg.dump());
+                System.out.printf("================%nMESSAGE #%d ON MY QUEUE RECEIVED:%n%s%n",
+                        queueMessages.incrementAndGet(), msg.dump());
                 msg.ackMessage();
             }
 
@@ -179,17 +180,9 @@ System.exit(-1);
         System.out.println(msg.dump());
         prod.send(msg,JCSMPFactory.onlyInstance().createTopic("test/pers"));
 
-        // TEST 3... resend the exact same message, no reset.  Does it work?  MessageID?
+        // TEST 3... resend the exact same message twice more, no reset.  Does it work?  What happens to MessageID?
         prod.send(msg,JCSMPFactory.onlyInstance().createTopic("test/pers"));
         prod.send(msg,JCSMPFactory.onlyInstance().createTopic("test/pers"));
-        
-        
-        
-        
-        
-        
-        
-        
         
         Thread.sleep(500);
         flow.stop();
