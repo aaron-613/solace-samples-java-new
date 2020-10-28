@@ -25,6 +25,8 @@ import java.util.UUID;
 
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
+import com.solacesystems.jcsmp.JCSMPErrorResponseException;
+import com.solacesystems.jcsmp.JCSMPErrorResponseSubcodeEx;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -79,7 +81,7 @@ public class DirectPublisher {
         session.connect();
 
         /** Anonymous inner-class for handling publishing events */
-        XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
                 // deprecated, superseded by responseReceivedEx()
@@ -95,8 +97,12 @@ public class DirectPublisher {
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
                     isShutdown = true;
+                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
+                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
+                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
+                    System.out.println(cause);
                 }
             }
         });
@@ -112,12 +118,12 @@ public class DirectPublisher {
                     message.setData(payload);
                     // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
                     String topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/pub/").append(chosenCharacter).toString();
-                    message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
+                    message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
                     try {
-                       //Thread.sleep(0);
+                        //Thread.sleep(0);
                         Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
@@ -135,7 +141,7 @@ public class DirectPublisher {
         t.setDaemon(true);
         t.start();
 
-        System.out.println("Connected, and running. Press [ENTER] to quit.");
+        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
         while (System.in.available() == 0 && !isShutdown) {
             Thread.sleep(1000);

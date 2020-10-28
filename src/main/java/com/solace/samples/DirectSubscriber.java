@@ -42,10 +42,10 @@ public class DirectSubscriber {
     private static final String SAMPLE_NAME = DirectSubscriber.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
-    private static boolean VERIFY_PAYLOAD_DATA = true;            // should we do some "processing" of incoming messages? (just for example)
-    private static volatile int msgRecvCounter = 0;                   // num messages received
+    private static boolean VERIFY_PAYLOAD_DATA = true;           // should we do some "processing" of incoming messages? (just for example)
+    private static volatile int msgRecvCounter = 0;              // num messages received
     private static volatile boolean hasDetectedDiscard = false;  // detected any discards yet?
-    private static volatile boolean isShutdown = false;          // are we done?
+    private static volatile boolean isShutdown = false;          // are we done yet?
 
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
@@ -70,7 +70,7 @@ public class DirectSubscriber {
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
             @Override
-            public void handleEvent(SessionEventArgs event) {
+            public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
                 System.out.printf("### Received a Session event: %s%n",event);
             }
         });
@@ -82,7 +82,7 @@ public class DirectSubscriber {
             @Override
             public void onReceive(BytesXMLMessage message) {
                 msgRecvCounter++;
-                if (message.getDiscardIndication()) {  // check if there have been any lost any messages
+                if (message.getDiscardIndication()) {  // since Direct messages, check if there have been any lost any messages
                     // If the consumer is being over-driven (i.e. publish rates too high), the broker might discard some messages for this consumer
                     // check this flag to know if that's happened
                     // to avoid discards:
@@ -117,19 +117,17 @@ public class DirectSubscriber {
 
             @Override
             public void onException(JCSMPException e) {  // uh oh!
-                System.err.println("### Exception thrown to the Consumer's onException()");
-                e.printStackTrace();
-                if (e instanceof JCSMPTransportException) {  // pretty bad, not recoverable
-                	// means that all the reconnection attempts have failed
-                	isShutdown = true;  // let's quit
+                System.out.printf("### MessageListener's onException(): %s%n",e);
+                if (e instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
+                    isShutdown = true;  // let's quit
                 }
             }
         });
 
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));  // add multiple wildcard subscriptions
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));
         consumer.start();
-        System.out.println("Connected, and running...");
+        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
             while (System.in.available() == 0 && !isShutdown) {
                 Thread.sleep(1000);  // wait 1 second

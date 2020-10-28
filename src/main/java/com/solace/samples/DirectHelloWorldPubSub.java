@@ -70,7 +70,7 @@ public class DirectHelloWorldPubSub {
         session.connect();  // connect to the broker
         
         // setup Producer callbacks config: simple anonymous inner-class for handling publishing events
-        XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
                 // deprecated, superseded by responseReceivedEx()
@@ -107,8 +107,8 @@ public class DirectHelloWorldPubSub {
             @Override
             public void onException(JCSMPException e) {  // oh no!
                 System.out.printf("### MessageListener's onException(): %s%n",e);
-                if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
+                if (e instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
+                    isShutdown = true;  // let's quit
                 }
             }
         });
@@ -137,13 +137,13 @@ public class DirectHelloWorldPubSub {
                 message.setText(String.format("Hello World #%d from %s!", msgSeqNum,uniqueName));
                 // make a dynamic topic: solace/samples/hello/[uniqueName]/123
                 String topicString = String.format("%s/hello/%s/%d", TOPIC_PREFIX,uniqueName,msgSeqNum);
-                
+
                 System.out.printf(">> Calling send() for #%d on %s%n",msgSeqNum,topicString);
                 producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it
                 Thread.sleep(5000);  // take a pause
 	        } catch (JCSMPException e) {
-	            System.out.printf("### Exception caught during publish(): %s%n",e);
+	            System.out.printf("### Exception caught during producer.send(): %s%n",e);
 	            if (e instanceof JCSMPTransportException) {  // unrecoverable
 	                isShutdown = true;
 	            }

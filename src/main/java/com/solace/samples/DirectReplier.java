@@ -27,7 +27,8 @@ import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
+import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.TextMessage;
@@ -42,14 +43,14 @@ public class DirectReplier {
 
     private static volatile boolean isShutdown = false;
 
-    public static void main(String... args) throws JCSMPException {
+    public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {   // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
                     SAMPLE_NAME);
             System.exit(-1);
         }
-
         System.out.println(SAMPLE_NAME+" initializing...");
+        
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
@@ -57,7 +58,6 @@ public class DirectReplier {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR, true);
         properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
@@ -73,15 +73,25 @@ public class DirectReplier {
         session.connect();
 
         /** Anonymous inner-class for handling publishing events */
-        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
-            @Override
+        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+            @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
-                System.out.println("Producer received response for msg: " + messageID);
+                // deprecated, superseded by responseReceivedEx()
             }
-
-            @Override
+            @Override @SuppressWarnings("deprecation")
             public void handleError(String messageID, JCSMPException e, long timestamp) {
-                System.out.printf("Producer received error for msg: %s@%s - %s%n", messageID, timestamp, e);
+                // deprecated, superseded by handleErrorEx()
+            }
+            @Override public void responseReceivedEx(Object key) {
+                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
+            }
+            // can be called for ACL violations, connection loss, and Persistent NACKs
+            @Override
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdown = true;
+                }
             }
         });
 
@@ -89,8 +99,10 @@ public class DirectReplier {
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage requestMsg) {
+                System.out.println(requestMsg.dump());
                 if (requestMsg.getDestination().getName().contains("direct/request") && requestMsg.getReplyTo() != null) {
-                    System.out.printf("Received request on '%s', generating response.",requestMsg.getDestination());
+                    System.out.printf("Received request on '%s', generating response.%n",requestMsg.getDestination());
+                    System.out.println(requestMsg.dump());
                     TextMessage replyMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);  // reply with a Text
                     if (requestMsg.getApplicationMessageId() != null) {
                         replyMsg.setApplicationMessageId(requestMsg.getApplicationMessageId());  // populate for traceability
@@ -101,8 +113,10 @@ public class DirectReplier {
                         // only allowed to publish messages from API-owned (callback) thread when JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR == false
                         producer.sendReply(requestMsg, replyMsg);  // convenience method: copies in reply-to, correlationId, etc.
                     } catch (JCSMPException e) {
-                        System.out.println("Error sending reply.");
-                        e.printStackTrace();
+                        System.out.printf("### Caught while trying to producer.sendReply(): %s%n",e);
+                        if (e instanceof JCSMPTransportException) {  // unrecoverable
+                            isShutdown = true;
+                        }
                     }
                 } else {
                     System.out.println("Received message without reply-to field");
@@ -120,17 +134,18 @@ public class DirectReplier {
         // will match "solace/samples/direct/request" as well as "solace/samples/direct/request/anything/else"
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request/\u0003"));
         // for use with HTTP MicroGateway feature, will respond to REST GET request on same URI
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/"+TOPIC_PREFIX+"/direct/request/\u0003"));
         // try doing: curl -u default:default http://localhost:9000/solace/samples/direct/request/hello
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/"+TOPIC_PREFIX+"/direct/request/\u0003"));
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));
         cons.start();
 
-        // Consume-only session is now hooked up and running!
-        System.out.println("Listening for request messages... Press [ENTER] to exit");
+        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
-            System.in.read();
-        } catch (IOException e) {
-            e.printStackTrace();
+            while (System.in.available() == 0 && !isShutdown) {
+                Thread.sleep(1000);  // wait 1 second
+            }
+        } catch (InterruptedException e) {
+            // Thread.sleep() interrupted... probably getting shut down
         }
         System.out.println("Main thread quitting.");
         isShutdown = true;

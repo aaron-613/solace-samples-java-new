@@ -46,8 +46,9 @@ public class DirectRequestor {
     
     private static final String SAMPLE_NAME = DirectRequestor.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int APPROX_MSG_RATE_PER_SEC = 1;
+    private static final int REQUEST_TIMEOUT_MS = 5000;  // time to wait for a reply before timing out
 
+    private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
 
     public static void main(String... args) throws JCSMPException, IOException {
@@ -82,7 +83,7 @@ public class DirectRequestor {
 
         /** Anonymous inner-class for handling publishing events */
         @SuppressWarnings("unused")
-        XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override @SuppressWarnings("deprecation")
             public void responseReceived(String messageID) {
                 // deprecated, superseded by responseReceivedEx()
@@ -104,44 +105,35 @@ public class DirectRequestor {
             }
         });
 
-//        XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);  // rare use of synchronous consumer mode
-        XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
-            
-            @Override
-            public void onReceive(BytesXMLMessage message) {
-                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",message.dump());  // just print
-            }
-            
-            @Override
-            public void onException(JCSMPException e) {
-                System.out.printf("### MessageListener's onException(): %s%n",e);
-                if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
-                }
-            }
-        });
+        final XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);  // less common use of synchronous consumer mode
         consumer.start();  // needed to accept the responses
 
-        //Time to wait for a reply before timing out
-        final int timeoutMs = 10000;
+        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         TextMessage requestMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        final String text = "Sample Request";
-        //request.setText(text);
-
         try {
             while (System.in.available() == 0 && !isShutdown) {
                 try {
-                    Requestor requestor = session.createRequestor();  // create the Requestor object
+                    requestMsg.setText(String.format("Hello, this is reqeust #%d",msgSentCounter));
                     Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request");
-                    System.out.printf("About to send request message '%s' to topic '%s'...%n",text,topic.getName());
-                    // perform blocking/synchronous call using convenience method request()
-                    BytesXMLMessage reply = requestor.request(requestMsg, timeoutMs, topic);
-                    System.out.printf("Response Message Dump:%n%s%n",reply.dump());
-                    Thread.sleep(APPROX_MSG_RATE_PER_SEC/1000);
+                    System.out.printf("About to send request message #%d to topic '%s'...%n",msgSentCounter,topic.getName());
+                    Requestor requestor = session.createRequestor();  // create the useful Requestor object
+                    /* perform blocking/synchronous call using convenience method request()
+                     * request() automatically populates the message's replyTo and correlationID fields:
+                     *  - replyTo is a header with a topic, and determines where the Replier sends the response message
+                     *  - correlationID is another header, and is used to determine _which_ outbound request this reply is for
+                     */
+                    BytesXMLMessage replyMsg = requestor.request(requestMsg, REQUEST_TIMEOUT_MS, topic);  // send and receive in one call
+                    msgSentCounter++;  // add one
+                    System.out.printf("Response Message Dump:%n%s%n",replyMsg.dump());
+                    requestMsg.reset();  // reuse this message, to avoid having to recreate it: better performance
+                    Thread.sleep(1000);  // approx. one request per second
                 } catch (JCSMPRequestTimeoutException e) {
-                    System.out.println("Failed to receive a reply in " + timeoutMs + " msecs");
-                } catch (JCSMPException e) {
-                    
+                    System.out.println("Failed to receive a reply in " + REQUEST_TIMEOUT_MS + " msecs");
+                } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
+                    System.out.printf("### Caught while trying to producer.send(): %s%n",e);
+                    if (e instanceof JCSMPTransportException) {  // unrecoverable
+                        isShutdown = true;
+                    }
                 } catch (InterruptedException e1) {
                     // Thread.sleep interrupted... probably getting shut down
                 }

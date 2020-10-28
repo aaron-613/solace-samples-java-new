@@ -22,8 +22,9 @@ package com.solace.samples;
 import java.io.IOException;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
-import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
+import com.solacesystems.jcsmp.JCSMPErrorResponseException;
+import com.solacesystems.jcsmp.JCSMPErrorResponseSubcodeEx;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
@@ -41,13 +42,15 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
  * A Processor is a microservice or application that receives a message, does something with the info,
  * and then sends it on..!  It is both a publisher and a subscriber, but (mainly) publishes data once
  * it has received an input message.
+ * This class is meant to be used with DirectPub and DirectSub, intercepting the published messages and
+ * sending them on to a different topic.
  */
 public class DirectProcessor {
 
     private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     
-    private static boolean isShutdown = false;
+    private static volatile boolean isShutdown = false;  // are we done yet?
 
     public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
@@ -64,8 +67,7 @@ public class DirectProcessor {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR,true);
-        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
@@ -97,7 +99,11 @@ public class DirectProcessor {
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = false;
+                    isShutdown = true;
+                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
+                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
+                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
+                    System.out.println(cause);
                 }
             }
         });
@@ -117,17 +123,15 @@ public class DirectProcessor {
                     String [] inboundTopicLevels = inboundMsg.getDestination().getName().split("/");
                     String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundTopicLevels[4]).toString();
                     try {
-                        // only allowed to publish messages from API-owned (callback) thread when JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR == false
-                        
-                        outboundMsg.setDeliveryMode(DeliveryMode.PERSISTENT);
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
-                    } catch (JCSMPException e) {
-                        System.out.println("### Error sending reply.");
-                        e.printStackTrace();
-
+                    } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
+                        System.out.printf("### Caught while trying to producer.send(): %s%n",e);
+                        if (e instanceof JCSMPTransportException) {  // unrecoverable
+                            isShutdown = true;
+                        }
                     }
-                } else {
-                    System.out.println("Received message without reply-to field");
+                } else {  // wasn't expecting this..?
+                    System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",inboundMsg.dump());  // just print
                 }
             }
 
@@ -140,8 +144,7 @@ public class DirectProcessor {
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));
         cons.start();
 
-        // Consume-only session is now hooked up and running!
-        System.out.println("Listening for incoming messages. Press [ENTER] to exit");
+        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
             try {
                 Thread.sleep(1000);  // take a pause
