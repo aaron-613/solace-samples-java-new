@@ -21,13 +21,15 @@ package com.solace.samples;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.solacesystems.jcsmp.BytesMessage;
-import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPErrorResponseException;
@@ -43,7 +45,61 @@ import com.solacesystems.jcsmp.ProducerEventArgs;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
-public class GuaranteedPublisher {
+public class GuaranteedPublisherAckTrack {
+    
+    
+    
+    /** Inner helper class object for managing ACKs and NACKs for published Guaranteed messages */
+    public static class MessageAckInfo {
+        
+        public enum AckStatus {
+            UNACK("UNACKed"),  // waiting
+            ACK("ACKed"),      // success
+            NACK("NACKed"),    // failure
+            ;
+            
+            final String status;
+            
+            AckStatus(String status) {
+                this.status = status;
+            }
+            
+            @Override
+            public String toString() {
+                return String.format("%-7s",status);  // fixed-width, right-align the status
+            }
+        }
+        
+        private static AtomicLong myUniquePubSeqCount = new AtomicLong(1);  // or initialize from somewhere else
+        
+        private AckStatus ackStatus = AckStatus.UNACK;  // for now, when first published
+        private final BytesMessage message;
+        private final long id = myUniquePubSeqCount.getAndIncrement();
+        
+        public MessageAckInfo(BytesMessage message) {
+            this.message = message;
+        }
+        
+        public void ack() {
+            ackStatus = AckStatus.ACK;
+        }
+        
+        public void nack() {
+            ackStatus = AckStatus.NACK;
+        }
+        
+        public AckStatus getAckStatus() {
+            return ackStatus;
+        }
+        
+        @Override
+        public String toString() {
+//            return String.format("MsgID: %d %s -- %s",id,ackStatus,message.toString());
+            return String.format("MsgID: %d %s",id,ackStatus);
+        }
+    }
+    // END HELPER CLASS //////////////////////////////////////////////////////////
+
     
     /** Static inner class to keep code clean, used for handling ACKs/NACKs from broker **/
     private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
@@ -60,9 +116,16 @@ public class GuaranteedPublisher {
         
         @Override
         public void responseReceivedEx(Object key) {
+            logger.info(String.format("ACK %d START: %s",((MessageAckInfo)key).id,key));
             assert key != null;  // this shouldn't happen, this should only get called for an ACK
-            assert key instanceof BytesXMLMessage;
-            logger.debug(String.format("ACK for Message %s",key));  // good enough, the broker has it now
+            assert key instanceof MessageAckInfo;
+            try {
+                MessageAckInfo cKey = messagesAwaitingAcksRingBuffer.remove();  // will throw an exception if it's empty, should be impossible
+                assert cKey == key;  // literally the same object!
+                cKey.ack();  // we've received the ACK, so now we're done
+            } finally {
+                logger.info(String.format("  ACK %d END: %s",((MessageAckInfo)key).id,key));
+            }
         }
 
         // can be called for ACL violations, connection loss, and Persistent NACKs
@@ -75,24 +138,32 @@ public class GuaranteedPublisher {
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
                     System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
-                    System.out.println(cause);
                 }
                 return;
             }  // else...
-            System.out.println("### NACK received! "+key);  // oh no
-            assert key instanceof BytesXMLMessage;
-            logger.warn(String.format("NACK for Message %s",key));
-            // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
+            System.out.println("### NACK received! "+key);
+            assert key instanceof MessageAckInfo;
+            try {
+                MessageAckInfo cKey = messagesAwaitingAcksRingBuffer.remove();  // will throw an exception if it's empty, should be impossible
+                assert cKey == key;
+                cKey.nack();
+                // now what?? Should we redlivery or something?  Maybe call some method or something as to what to do with this message?
+            } catch (NoSuchElementException e) {
+                throw new AssertionError("List was empty!",e);
+            } finally {
+                System.out.println("### NACK ending!");
+            }
         }
     }
     //////////////////////////////////////////////////////
     
-    private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
+    private static final String SAMPLE_NAME = GuaranteedPublisherAckTrack.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     
     private static final int PUBLISH_WINDOW_SIZE = 5;
-    private static final Logger logger = LogManager.getLogger(GuaranteedPublisher.class);  // could also use SLF4J, JCL, etc.
+    private static final Logger logger = LogManager.getLogger(GuaranteedPublisherAckTrack.class);
 
+    private static final ArrayBlockingQueue<MessageAckInfo> messagesAwaitingAcksRingBuffer = new ArrayBlockingQueue<>(110000);
     private static volatile boolean isShutdown = false;
     
     
@@ -150,11 +221,15 @@ public class GuaranteedPublisher {
 //                        SDTMap map = JCSMPFactory.onlyInstance().createMap();
 //                        map.putString("sample","JCSMP GuaranteedPublisher");
 //                        message.setProperties(map);
-                        message.setCorrelationKey(message);  // used for ACK/NACK correlation
+                        MessageAckInfo key = new MessageAckInfo(message);  // make a new structure for watching this message
+                        message.setCorrelationKey(key);  // used for ACK/NACK correlation
                         //message.setAckImmediately(true);
                         try {
+                            messagesAwaitingAcksRingBuffer.put(key);  // NEED NEED NEED to add it before the send() in case of race condition and the ACK comes back before it's added to the list
+                            logger.info(String.format("           SEND %d START: %s",key.id,key));
                             producer.send(message,topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
-                            Thread.sleep(1000);
+                            //logger.info(String.format("           SEND %d END:   %s",key.id,key));
+                            Thread.sleep(0);
                             //Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                             // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                         } catch (InterruptedException e) {
