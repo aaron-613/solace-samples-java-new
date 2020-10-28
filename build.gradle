@@ -65,6 +65,22 @@ dependencies {
     testImplementation group: 'org.glassfish', name: 'javax.json', version: '1.1.4'
 }
 
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/main/java'
+            exclude '**/Blah.java'
+       }
+       // Used to pick up resources at the root of the application directory
+//       resources {
+//           srcDir 'src/main/resources'
+//           exclude 'log4j2.xml'
+//       }
+   }
+}
+
+
 // unused, so commenting out (Issue #58)
 //task createAllStartScripts() << {
      // just a placeholder
@@ -82,6 +98,7 @@ def scripts = ['DirectHelloWorldPubSub':'com.solace.samples.DirectHelloWorldPubS
     'DirectSubscriber':'com.solace.samples.DirectSubscriber',
     'GuaranteedProcessor':'com.solace.samples.GuaranteedProcessor',
     'GuaranteedPublisher':'com.solace.samples.GuaranteedPublisher',
+    'GuaranteedPublisherAckTrack':'com.solace.samples.GuaranteedPublisherAckTrack',
     'GuaranteedReplier':'com.solace.samples.GuaranteedReplier',
     'GuaranteedRequestor':'com.solace.samples.GuaranteedRequestor',
     'GuaranteedSubscriber':'com.solace.samples.GuaranteedSubscriber',
