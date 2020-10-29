@@ -61,26 +61,25 @@ public class GuaranteedSubscriber {
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
 
-        //System.out.printf("Attempting to connect to queue '%s' on the Solace broker.%n",QUEUE_NAME);
-        final EndpointProperties endpointProps = new EndpointProperties();
-        // set queue permissions to "consume" and access-type to "exclusive"
-        endpointProps.setPermission(EndpointProperties.PERMISSION_CONSUME);
-        endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
-        // create the queue API object locally
+        // configure the queue API object locally
         final Queue queue = JCSMPFactory.onlyInstance().createQueue(QUEUE_NAME);
+
+//        final EndpointProperties endpointProps = new EndpointProperties();
+        // set queue permissions to "consume" and access-type to "exclusive"
+//        endpointProps.setPermission(EndpointProperties.PERMISSION_CONSUME);
+//        endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
         // Actually provision it, and do not fail if it already exists
         //session.provision(queue, endpointProps, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
 
-
         System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
+//      EndpointProperties endpoint_props = new EndpointProperties();
+//      endpoint_props.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
+
 
         // Create a Flow be able to bind to and consume messages from the Queue.
         final ConsumerFlowProperties flow_prop = new ConsumerFlowProperties();
         flow_prop.setEndpoint(queue);
         flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
-
-        EndpointProperties endpoint_props = new EndpointProperties();
-        endpoint_props.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
 
         final FlowReceiver flowQueueReceiver;
         try {
@@ -99,13 +98,13 @@ public class GuaranteedSubscriber {
                 public void onException(JCSMPException e) {
                     System.out.printf("Consumer received exception: %s%n", e);
                 }
-            }, flow_prop, endpoint_props);
-        } catch (OperationNotSupportedException e) {
-            e.printStackTrace();
+            }, flow_prop,null);
+        } catch (OperationNotSupportedException e) {  // not allowed to do this
             throw e;
-        } catch (JCSMPErrorResponseException e) {
+        } catch (JCSMPErrorResponseException e) {  // something else went wrong: queue not exist, queue shutdoown, etc.
             System.out.println("Could not establish a connection to the queue. Does it exist?");
             System.out.println("Create the queue using PubSub+ Manager GUI tool, or see the scripts inside the 'semp-rest-api' directory.");
+            System.out.println();
             throw e;
         }
 

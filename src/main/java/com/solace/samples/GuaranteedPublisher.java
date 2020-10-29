@@ -65,10 +65,18 @@ public class GuaranteedPublisher {
             logger.debug(String.format("ACK for Message %s",key));  // good enough, the broker has it now
         }
 
-        // can be called for ACL violations, connection loss, and Persistent NACKs
         @Override
         public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-            if (key == null) {
+            if (key != null) {  // NACK
+                assert key instanceof BytesXMLMessage;
+                logger.warn(String.format("NACK for Message %s",key));
+                // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
+                //  - send the message again
+                //  - send it somewhere else (error handling queue?)
+                //  - log and continue
+                //  - pause and retry (backuoff)
+                //  - attempt to rollback state, send a different message ot reset?
+            } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
                     isShutdown = true;
@@ -77,21 +85,18 @@ public class GuaranteedPublisher {
                     System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
                     System.out.println(cause);
                 }
-                return;
-            }  // else...
-            System.out.println("### NACK received! "+key);  // oh no
-            assert key instanceof BytesXMLMessage;
-            logger.warn(String.format("NACK for Message %s",key));
-            // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
+            }
         }
     }
     //////////////////////////////////////////////////////
     
     private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final int APPROX_MSG_RATE_PER_SEC = 1;
+    private static final int PAYLOAD_SIZE = 1000;
     
     private static final int PUBLISH_WINDOW_SIZE = 5;
-    private static final Logger logger = LogManager.getLogger(GuaranteedPublisher.class);  // could also use SLF4J, JCL, etc.
+    private static final Logger logger = LogManager.getLogger(GuaranteedPublisher.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
     private static volatile boolean isShutdown = false;
     
@@ -129,8 +134,6 @@ public class GuaranteedPublisher {
             }
         });
         
-        final int APPROX_MSG_RATE_PER_SEC = 1;
-        final int PAYLOAD_SIZE = 100;
 
         Runnable pubThread = new Runnable() {
             @Override
@@ -154,8 +157,8 @@ public class GuaranteedPublisher {
                         //message.setAckImmediately(true);
                         try {
                             producer.send(message,topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
-                            Thread.sleep(1000);
-                            //Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                            //Thread.sleep(1000);
+                            Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                             // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                         } catch (InterruptedException e) {
                             isShutdown = true;
