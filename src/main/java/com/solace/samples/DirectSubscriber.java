@@ -134,7 +134,7 @@ public class DirectSubscriber {
                 System.out.printf("Received msgs/s: %,d%n",msgRecvCounter);  // simple way of calculating message rates
                 msgRecvCounter = 0;
                 if (hasDetectedDiscard) {
-                    System.out.println("*** Egress discard detected *** : DirectSubscriber unable to keep up with full message rate");
+                    System.out.println("*** Egress discard detected *** : "+SAMPLE_NAME+" unable to keep up with full message rate");
                     hasDetectedDiscard = false;  // only show the error once per second
                 }
             }

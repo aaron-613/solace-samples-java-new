@@ -22,6 +22,7 @@ package com.solace.samples;
 import java.io.IOException;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
@@ -117,11 +118,12 @@ public class DirectRequestor {
                     Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request");
                     System.out.printf("About to send request message #%d to topic '%s'...%n",msgSentCounter,topic.getName());
                     Requestor requestor = session.createRequestor();  // create the useful Requestor object
-                    /* perform blocking/synchronous call using convenience method request()
+                    /* perform blocking/synchronous call using convenience Requestor object.   (only for Direct messaging)
                      * request() automatically populates the message's replyTo and correlationID fields:
                      *  - replyTo is a header with a topic, and determines where the Replier sends the response message
                      *  - correlationID is another header, and is used to determine _which_ outbound request this reply is for
                      */
+                    requestMsg.setDeliveryMode(DeliveryMode.PERSISTENT);
                     BytesXMLMessage replyMsg = requestor.request(requestMsg, REQUEST_TIMEOUT_MS, topic);  // send and receive in one call
                     msgSentCounter++;  // add one
                     System.out.printf("Response Message Dump:%n%s%n",replyMsg.dump());
