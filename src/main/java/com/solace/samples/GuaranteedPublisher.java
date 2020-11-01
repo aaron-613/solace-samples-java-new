@@ -77,13 +77,12 @@ public class GuaranteedPublisher {
                 //  - pause and retry (backuoff)
                 //  - attempt to rollback state, send a different message ot reset?
             } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
-                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                logger.warn("### Producer handleErrorEx() callback: %s%n",cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
                     isShutdown = true;
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
-                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
-                    System.out.println(cause);
+                    logger.warn("Specifics: " + JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
                 }
             }
         }
@@ -92,10 +91,11 @@ public class GuaranteedPublisher {
     
     private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int APPROX_MSG_RATE_PER_SEC = 1;
+
+    private static final int PUBLISH_WINDOW_SIZE = 50;
+    private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 1000;
     
-    private static final int PUBLISH_WINDOW_SIZE = 5;
     private static final Logger logger = LogManager.getLogger(GuaranteedPublisher.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
     private static volatile boolean isShutdown = false;
@@ -107,15 +107,15 @@ public class GuaranteedPublisher {
             System.out.println();
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME+" initializing...");
+        logger.info(SAMPLE_NAME+" initializing...");
 
         // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
-        properties.setProperty(JCSMPProperties.VPN_NAME, args[1]); // message-vpn
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
+        properties.setProperty(JCSMPProperties.HOST, args[0]);      // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME, args[1]);  // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]);  // client-username
         if (args.length > 3) { 
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3] ); // client-password
         }
         properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,PUBLISH_WINDOW_SIZE);
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
@@ -130,7 +130,7 @@ public class GuaranteedPublisher {
         @Override
         public void handleEvent(ProducerEventArgs event) {
             // as of Oct 2020, this event only occurs when republishing unACKed messages on an unknown flow
-                System.out.println("*** Received a producer event: "+event);
+                logger.info("*** Received a producer event: "+event);
             }
         });
         
@@ -157,7 +157,7 @@ public class GuaranteedPublisher {
                         //message.setAckImmediately(true);
                         try {
                             producer.send(message,topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
-                            //Thread.sleep(1000);
+                            //Thread.sleep(0);
                             Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                             // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                         } catch (InterruptedException e) {
@@ -168,7 +168,7 @@ public class GuaranteedPublisher {
                 } catch (JCSMPException e) {
                     e.printStackTrace();
                 } finally {
-                    System.out.println("Publisher Thread shutdown");
+                    logger.info("Publisher Thread shutdown");
                 }
             }
         };

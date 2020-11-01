@@ -21,9 +21,11 @@ package com.solace.samples;
 
 import java.io.IOException;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
-import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.FlowReceiver;
 import com.solacesystems.jcsmp.JCSMPErrorResponseException;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -39,8 +41,11 @@ public class GuaranteedSubscriber {
     private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
     private static final String QUEUE_NAME = "q_samples";
     
-    private static volatile int msgRecvCounter = 0;                   // num messages received
+    private static volatile int msgRecvCounter = 0;                 // num messages received
+    private static volatile boolean hasDetectedRedelivery = false;  // detected any messages being redelivered?
     private static volatile boolean isShutdown = false;          // are we done?
+
+    private static final Logger logger = LogManager.getLogger(GuaranteedSubscriber.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
 
     public static void main(String... args) throws JCSMPException, InterruptedException, IOException {
@@ -63,40 +68,30 @@ public class GuaranteedSubscriber {
 
         // configure the queue API object locally
         final Queue queue = JCSMPFactory.onlyInstance().createQueue(QUEUE_NAME);
-
-//        final EndpointProperties endpointProps = new EndpointProperties();
-        // set queue permissions to "consume" and access-type to "exclusive"
-//        endpointProps.setPermission(EndpointProperties.PERMISSION_CONSUME);
-//        endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
-        // Actually provision it, and do not fail if it already exists
-        //session.provision(queue, endpointProps, JCSMPSession.FLAG_IGNORE_ALREADY_EXISTS);
-
-        System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
-//      EndpointProperties endpoint_props = new EndpointProperties();
-//      endpoint_props.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
-
-
         // Create a Flow be able to bind to and consume messages from the Queue.
         final ConsumerFlowProperties flow_prop = new ConsumerFlowProperties();
         flow_prop.setEndpoint(queue);
         flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
-
         final FlowReceiver flowQueueReceiver;
+        System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
         try {
             flowQueueReceiver = session.createFlow(new XMLMessageListener() {
                 @Override
                 public void onReceive(BytesXMLMessage msg) {
                     msgRecvCounter++;
+                    if (msg.getRedelivered()) {
+                        hasDetectedRedelivery = true;
+                    }
     
                     // When the ack mode is set to SUPPORTED_MESSAGE_ACK_CLIENT,
-                    // guaranteed delivery messages are acknowledged after
-                    // processing
+                    // guaranteed delivery messages are acknowledged after processing
+                    // NOTE that messages can be acknowledged from a different thread
                     msg.ackMessage();
                 }
     
                 @Override
                 public void onException(JCSMPException e) {
-                    System.out.printf("Consumer received exception: %s%n", e);
+                    logger.warn("Consumer received exception: %s%n", e);
                 }
             }, flow_prop,null);
         } catch (OperationNotSupportedException e) {  // not allowed to do this
@@ -107,11 +102,9 @@ public class GuaranteedSubscriber {
             System.out.println();
             throw e;
         }
-
-        // Start the consumer
-        System.out.println("Connected. Awaiting message ...");
+        
         flowQueueReceiver.start();
-
+        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
             while (System.in.available() == 0 && !isShutdown) {
                 Thread.sleep(1000);  // wait 1 second
