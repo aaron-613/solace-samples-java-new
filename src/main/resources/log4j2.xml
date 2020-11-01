@@ -12,7 +12,7 @@
     <Logger name="com.solace.samples" level="info" additivity="false">
       <AppenderRef ref="Console"/>
     </Logger>
-    <Logger name="com.solace.samples.GuaranteedPublisher" level="trace" additivity="false">
+    <Logger name="com.solace.samples.GuaranteedPublisher" level="debug" additivity="false">
       <AppenderRef ref="Console"/>
     </Logger>
     <Root level="info">
