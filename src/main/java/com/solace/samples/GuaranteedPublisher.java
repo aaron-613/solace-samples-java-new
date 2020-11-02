@@ -40,20 +40,21 @@ import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.ProducerEventArgs;
+import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class GuaranteedPublisher {
     
-    /** Static inner class to keep code clean, used for handling ACKs/NACKs from broker **/
+    /** Very simple static inner class, used for handling ACKs/NACKs from broker **/
     private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
         
-        @Override
+        @Override @SuppressWarnings("deprecation")
         public void responseReceived(String messageID) {
             // deprecated, superseded by responseReceivedEx()
         }
         
-        @Override
+        @Override @SuppressWarnings("deprecation")
         public void handleError(String messageID, JCSMPException e, long timestamp) {
             // deprecated, superseded by handleErrorEx()
         }
@@ -93,11 +94,12 @@ public class GuaranteedPublisher {
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
     private static final int PUBLISH_WINDOW_SIZE = 50;
-    private static final int APPROX_MSG_RATE_PER_SEC = 100;
-    private static final int PAYLOAD_SIZE = 1000;
+    private static final int APPROX_MSG_RATE_PER_SEC = 10;
+    private static final int PAYLOAD_SIZE = 512;
     
     private static final Logger logger = LogManager.getLogger(GuaranteedPublisher.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
+    private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
     
     
@@ -109,13 +111,12 @@ public class GuaranteedPublisher {
         }
         logger.info(SAMPLE_NAME+" initializing...");
 
-        // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);      // host:port
-        properties.setProperty(JCSMPProperties.VPN_NAME, args[1]);  // message-vpn
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]);  // client-username
-        if (args.length > 3) { 
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3] ); // client-password
+        properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
+        if (args.length > 3) {
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
         properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,PUBLISH_WINDOW_SIZE);
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
@@ -133,30 +134,32 @@ public class GuaranteedPublisher {
                 logger.info("*** Received a producer event: "+event);
             }
         });
-        
 
         Runnable pubThread = new Runnable() {
             @Override
             public void run() {
-                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/pers/"+"asdf");
                 byte[] payload = new byte[PAYLOAD_SIZE];
                 try {
                     while (!isShutdown) {
-//                        Arrays.fill(payload,(byte)(System.currentTimeMillis()%256));  // fill it with some "random" value
-                        Arrays.fill(payload,(byte)65);  // fill it with some "random" value
-                        // use a BytesMessage this sample, instead of TextMessage
                         BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+                        // each loop, change the payload
+                        char chosenCharacter = (char)(Math.round(System.nanoTime()%26)+65);  // choose a "random" letter [A-Z]
+                        Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
+                        // use a BytesMessage this sample, instead of TextMessage
                         message.setData(payload);
-                        message.setDeliveryMode(DeliveryMode.PERSISTENT);
+                        message.setDeliveryMode(DeliveryMode.PERSISTENT);  // required for Guaranteed
                         message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
-                        // let's define a user property!
-//                        SDTMap map = JCSMPFactory.onlyInstance().createMap();
-//                        map.putString("sample","JCSMP GuaranteedPublisher");
-//                        message.setProperties(map);
-                        message.setCorrelationKey(message);  // used for ACK/NACK correlation
+                        // as another example, let's define a user property!
+                        SDTMap map = JCSMPFactory.onlyInstance().createMap();
+                        map.putString("sample","JCSMP GuaranteedPublisher");
+                        message.setProperties(map);
+                        message.setCorrelationKey(message);  // used for ACK/NACK correlation locally within the API
                         //message.setAckImmediately(true);
+                        String topicString = new StringBuilder(TOPIC_PREFIX).append("/pers/pub/").append(chosenCharacter).toString();
+                        Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
+                        producer.send(message,topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
+                        msgSentCounter++;
                         try {
-                            producer.send(message,topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
                             //Thread.sleep(0);
                             Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                             // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
@@ -176,11 +179,17 @@ public class GuaranteedPublisher {
         t.setDaemon(true);
         t.start();
 
-        System.out.println("Connected, and running. Press [ENTER] to quit.");
+        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
-        System.in.read();  // wait for user to end
-        System.out.println("Quitting in 1 second.");
+        while (System.in.available() == 0 && !isShutdown) {
+            Thread.sleep(1000);
+            System.out.printf("Published msgs/s: %,d%n",msgSentCounter);  // simple way of calculating message rates
+            msgSentCounter = 0;
+        }
+        System.out.println("Main thread quitting.");
         isShutdown = true;
+        producer.close();
         Thread.sleep(1000);
+        session.closeSession();
     }
 }

@@ -94,6 +94,7 @@ public class DirectSubscriber {
                 // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
                 if (VERIFY_PAYLOAD_DATA) {
 //TODO: DO SEOMTHING ELSE HERE!!
+//  check for gaps in message sequence num..?
                     // as set in the publisher code, the payload should be filled with the same character as the last letter of the topic
                     if (message instanceof BytesMessage && message.getAttachmentContentLength() > 0) {  // non-empty BytesMessage
                         BytesMessage msg = (BytesMessage)message;  // cast the message (could also be TextMessage?)

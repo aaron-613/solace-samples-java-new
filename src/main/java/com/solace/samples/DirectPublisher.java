@@ -116,9 +116,9 @@ public class DirectPublisher {
                     char chosenCharacter = (char)(Math.round(System.nanoTime()%26)+65);  // choose a "random" letter [A-Z]
                     Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
                     message.setData(payload);
+                    message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
                     // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
                     String topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/pub/").append(chosenCharacter).toString();
-                    message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
