@@ -95,11 +95,11 @@ public class GuaranteedSubscriber {
         properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
-        }
+        }   
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                System.out.printf("### Received a Session event: %s%n",event);
+                logger.info("### Received a Session event: %s%n",event);
             }
         });
         session.connect();
@@ -119,7 +119,7 @@ public class GuaranteedSubscriber {
                 @Override
                 public void handleEvent(Object source, FlowEventArgs event) {
                     // Flow events are usually: active, reconnecting (i.e. unbound), reconnected
-                    System.out.printf("### Received a Flow event: %s%n",event);
+                    logger.info("### Received a Flow event: %s%n",event);
                 }
             });
         } catch (OperationNotSupportedException e) {  // not allowed to do this
@@ -149,7 +149,6 @@ public class GuaranteedSubscriber {
         System.out.println("Main thread quitting.");
         isShutdown = true;
         flowQueueReceiver.stop();
-        flowQueueReceiver.close();
         Thread.sleep(1000);
         session.closeSession();  // will also close consumer object
     }

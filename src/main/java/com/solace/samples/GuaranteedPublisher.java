@@ -41,6 +41,8 @@ import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.ProducerEventArgs;
 import com.solacesystems.jcsmp.SDTMap;
+import com.solacesystems.jcsmp.SessionEventArgs;
+import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
@@ -124,7 +126,12 @@ public class GuaranteedPublisher {
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session =  JCSMPFactory.onlyInstance().createSession(properties);
+        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+            @Override
+            public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
+                logger.info("### Received a Session event: %s%n",event);
+            }
+        });
         session.connect();
         
         XMLMessageProducer producer = session.getMessageProducer(new PublishCallbackHandler(), new JCSMPProducerEventHandler() {
@@ -188,8 +195,7 @@ public class GuaranteedPublisher {
         }
         System.out.println("Main thread quitting.");
         isShutdown = true;
-        producer.close();
-        Thread.sleep(1000);
+        Thread.sleep(1500);  // give time for the ACKs to arrive from the broker
         session.closeSession();
     }
 }
