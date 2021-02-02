@@ -56,7 +56,7 @@ repositories {
 
 dependencies {
     // Solace Messaging API for Java Dependencies
-    implementation group: 'com.solacesystems', name: 'sol-jcsmp', version: '10.9.0'
+    implementation group: 'com.solacesystems', name: 'sol-jcsmp', version: '10.10.0'
     // new an improved logging framework, no more slf4j
     implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.11.1'
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.11.1'
