@@ -3,10 +3,11 @@ plugins {
     id 'application'
     id 'idea'
     id 'eclipse'
+    id 'checkstyle'
 }
 
 
-// Don't need these task, so disabling them. Makes it possible to avoid
+// Don't need these tasks, so disabling them. Makes it possible to avoid
 // declaring a single application main class.
 startScripts.enabled = false
 run.enabled = false
@@ -70,6 +71,7 @@ sourceSets {
     main {
         java {
             srcDir 'src/main/java'
+            exclude '**/Guaran*'
             exclude '**/Blah.java'
        }
        // Used to pick up resources at the root of the application directory
@@ -78,6 +80,11 @@ sourceSets {
 //           exclude 'log4j2.xml'
 //       }
    }
+}
+
+checkstyle {
+    configFile file('config/checkstyle/checkstyle.xml');
+    toolVersion '8.27';
 }
 
 
