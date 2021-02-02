@@ -19,8 +19,6 @@
 
 package com.solace.samples;
 
-import java.io.IOException;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -35,6 +33,7 @@ import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+import java.io.IOException;
 
 public class DirectReplier {
 
@@ -43,13 +42,13 @@ public class DirectReplier {
 
     private static volatile boolean isShutdown = false;
 
+    /** Main method. */
     public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {   // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME+" initializing...");
+        System.out.println(SAMPLE_NAME + " initializing...");
         
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -63,28 +62,23 @@ public class DirectReplier {
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
+        final JCSMPSession session;
+        session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                System.out.printf("### Received a Session event: %s%n",event);
+                System.out.printf("### Received a Session event: %s%n", event);
             }
         });
         session.connect();
 
-        /** Anonymous inner-class for handling publishing events */
-        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-            @Override @SuppressWarnings("deprecation")
-            public void responseReceived(String messageID) {
-                // deprecated, superseded by responseReceivedEx()
-            }
-            @Override @SuppressWarnings("deprecation")
-            public void handleError(String messageID, JCSMPException e, long timestamp) {
-                // deprecated, superseded by handleErrorEx()
-            }
+        // Anonymous inner-class for handling publishing events
+        final XMLMessageProducer producer;
+        producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override public void responseReceivedEx(Object key) {
                 // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
+            
             // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
@@ -95,25 +89,25 @@ public class DirectReplier {
             }
         });
 
-        /** Anonymous inner-class for request handling **/
+        // Anonymous inner-class for request handling
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage requestMsg) {
                 System.out.println(requestMsg.dump());
                 if (requestMsg.getDestination().getName().contains("direct/request") && requestMsg.getReplyTo() != null) {
-                    System.out.printf("Received request on '%s', generating response.%n",requestMsg.getDestination());
+                    System.out.printf("Received request on '%s', generating response.%n", requestMsg.getDestination());
                     System.out.println(requestMsg.dump());
                     TextMessage replyMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);  // reply with a Text
                     if (requestMsg.getApplicationMessageId() != null) {
                         replyMsg.setApplicationMessageId(requestMsg.getApplicationMessageId());  // populate for traceability
                     }
-                    final String text = "Hello! Here is a response to your message on topic '"+requestMsg.getDestination()+"'.";
+                    final String text = "Hello! Here is a response to your message on topic '" + requestMsg.getDestination() + "'.";
                     replyMsg.setText(text);
                     try {
                         // only allowed to publish messages from API-owned (callback) thread when JCSMPProperties.MESSAGE_CALLBACK_ON_REACTOR == false
                         producer.sendReply(requestMsg, replyMsg);  // convenience method: copies in reply-to, correlationId, etc.
                     } catch (JCSMPException e) {
-                        System.out.printf("### Caught while trying to producer.sendReply(): %s%n",e);
+                        System.out.printf("### Caught while trying to producer.sendReply(): %s%n", e);
                         if (e instanceof JCSMPTransportException) {  // unrecoverable
                             isShutdown = true;
                         }
@@ -132,11 +126,11 @@ public class DirectReplier {
         // topic to listen to incoming (messaging) requests, using a special wildcard borrowed from MQTT:
         // https://docs.solace.com/Open-APIs-Protocols/MQTT/MQTT-Topics.htm#Using
         // will match "solace/samples/direct/request" as well as "solace/samples/direct/request/anything/else"
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/request/\u0003"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/request/\u0003"));
         // for use with HTTP MicroGateway feature, will respond to REST GET request on same URI
         // try doing: curl -u default:default http://localhost:9000/solace/samples/direct/request/hello
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/"+TOPIC_PREFIX+"/direct/request/\u0003"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/" + TOPIC_PREFIX + "/direct/request/\u0003"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/control/>"));
         cons.start();
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");

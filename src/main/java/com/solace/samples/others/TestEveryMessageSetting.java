@@ -19,9 +19,6 @@
 
 package com.solace.samples.others;
 
-import java.nio.charset.Charset;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.DeliveryMode;
@@ -31,7 +28,7 @@ import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.TextMessage;
@@ -39,6 +36,8 @@ import com.solacesystems.jcsmp.User_Cos;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+import java.nio.charset.Charset;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TestEveryMessageSetting {
 
@@ -46,16 +45,19 @@ public class TestEveryMessageSetting {
     private static AtomicInteger directMessages = new AtomicInteger(0);
     private static AtomicInteger queueMessages = new AtomicInteger(0);
     
+    /** Silly test to set as many message properties as possible. */
+    @SuppressWarnings("deprecation")
     public static void main(String... args) throws JCSMPException, InterruptedException {
 
         // Check command line arguments
         if (args.length < 3) {
-            System.out.println("Usage: "+TestEveryMessageSetting.class.getSimpleName()+" <host:port> <message-vpn> <client-username> [client-password]");
+            System.out.println("Usage: " + TestEveryMessageSetting.class.getSimpleName()
+                    + " <host:port> <message-vpn> <client-username> [client-password]");
             System.out.println();
             System.exit(-1);
         }
 
-        System.out.println(TestEveryMessageSetting.class.getSimpleName()+" initializing...");
+        System.out.println(TestEveryMessageSetting.class.getSimpleName() + " initializing...");
 
         // Create a JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
@@ -73,16 +75,16 @@ public class TestEveryMessageSetting {
         session.connect();
         System.out.println("Connected.");
 
-        /** Anonymous inner-class for handling publishing events */
-        XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
+        // Anonymous inner-class for handling publishing events
+        final XMLMessageProducer prod = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override
-            public void responseReceived(String messageID) {
-                System.out.println("******** Producer received response for msg: " + messageID);
+            public void responseReceivedEx(Object key) {
+                System.out.println("******** Producer received response for msg: " + key);
             }
+            
             @Override
-            public void handleError(String messageID, JCSMPException e, long timestamp) {
-                System.out.printf("********* Producer received error for msg: %s@%s - %s%n",
-                        messageID,timestamp,e);
+            public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+                System.out.printf("********* Producer received error for msg: %s@%s - %s%n", key, timestamp, cause);
             }
         });
 
@@ -116,11 +118,12 @@ public class TestEveryMessageSetting {
         msg.setCorrelationId("msg.setCorrelationId()");
         msg.setCorrelationKey(msg);
         msg.setCos(User_Cos.USER_COS_2);  // why not
+        
         msg.setDeliverToOne(true);  // old school, deprecated now in favour of Shared Subscriptions
         msg.setDeliveryMode(DeliveryMode.DIRECT);
         msg.setDMQEligible(true);
         msg.setElidingEligible(true);
-        msg.setExpiration(System.currentTimeMillis()+(1000*60*60*24));
+        msg.setExpiration(System.currentTimeMillis() + (1000 * 60 * 60 * 24));
         msg.setHTTPContentEncoding("msg.setHTTPContentEncoding()");
         msg.setHTTPContentType("msg.setHTTPContentType");
         msg.setPriority(254);
@@ -130,7 +133,7 @@ public class TestEveryMessageSetting {
         msg.setSenderId("msg.setSenderId()");
         msg.setSenderTimestamp(System.currentTimeMillis());
         msg.setSequenceNumber(123456789);
-        msg.setTimeToLive(1000*60);  // milliseconds
+        msg.setTimeToLive(1000 * 60);  // milliseconds
         msg.writeAttachment("msg.writeAttachment()".getBytes(UTF_8));  // binary payload, overwrites TextMsg body
         msg.writeBytes("msg.writeBytes()".getBytes(UTF_8));  // XML payload, don't use this, just a test
         System.out.println("Sending FULL Direct Text Message");
@@ -152,11 +155,11 @@ public class TestEveryMessageSetting {
         session.addSubscription(queue,JCSMPFactory.onlyInstance().createTopic("test/>"),JCSMPSession.WAIT_FOR_CONFIRM);
         
         // Create a Flow be able to bind to and consume messages from the Queue.
-        final ConsumerFlowProperties flow_prop = new ConsumerFlowProperties();
-        flow_prop.setEndpoint(queue);
-        flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
+        final ConsumerFlowProperties flowProp = new ConsumerFlowProperties();
+        flowProp.setEndpoint(queue);
+        flowProp.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
 
-        EndpointProperties endpoint_props = new EndpointProperties();
+        final EndpointProperties endpointProps2 = new EndpointProperties();
         //endpoint_props.setAccessType(EndpointProperties.ACCESSTYPE_EXCLUSIVE);
 
         final FlowReceiver flow = session.createFlow(new XMLMessageListener() {
@@ -171,7 +174,7 @@ public class TestEveryMessageSetting {
             public void onException(JCSMPException e) {
                 System.out.printf("Consumer received exception: %s%n", e);
             }
-        }, flow_prop, endpoint_props);
+        }, flowProp, endpointProps2);
         flow.start();
         
         msg.setText("Now Persistent Message!");
