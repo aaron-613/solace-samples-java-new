@@ -40,9 +40,9 @@ import java.io.InputStreamReader;
 /**
  * This simple introductory sample shows an application that both publishes and subscribes.
  */
-public class DirectHelloWorldPubSub {
+public class DirectHelloWorld {
     
-	private static final String SAMPLE_NAME = DirectHelloWorldPubSub.class.getSimpleName();
+	private static final String SAMPLE_NAME = DirectHelloWorld.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static volatile boolean isShutdown = false;      // are we done yet?
 
@@ -71,14 +71,6 @@ public class DirectHelloWorldPubSub {
         
         // setup Producer callbacks config: simple anonymous inner-class for handling publishing events
         final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-            @Override @SuppressWarnings("deprecation")
-            public void responseReceived(String messageID) {
-                // deprecated, superseded by responseReceivedEx()
-            }
-            @Override @SuppressWarnings("deprecation")
-            public void handleError(String messageID, JCSMPException e, long timestamp) {
-                // deprecated, superseded by handleErrorEx()
-            }
             @Override public void responseReceivedEx(Object key) {
                 // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
