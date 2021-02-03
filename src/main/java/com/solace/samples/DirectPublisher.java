@@ -139,14 +139,14 @@ public class DirectPublisher {
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
-        try {
-            while (System.in.available() == 0 && !isShutdown) {
+        while (System.in.available() == 0 && !isShutdown) {
+            try {
                 Thread.sleep(1000);
                 System.out.printf("Published msgs/s: %,d%n",msgSentCounter);  // simple way of calculating message rates
                 msgSentCounter = 0;
+            } catch (InterruptedException e) {
+                // Thread.sleep() interrupted... probably getting shut down
             }
-        } catch (InterruptedException e) {
-            // Thread.sleep() interrupted... probably getting shut down
         }
         isShutdown = true;
         session.closeSession();  // will also close producer object

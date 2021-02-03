@@ -134,15 +134,15 @@ public class DirectReplier {
         cons.start();
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
-        try {
-            while (System.in.available() == 0 && !isShutdown) {
+        while (System.in.available() == 0 && !isShutdown) {
+            try {
                 Thread.sleep(1000);  // wait 1 second
+            } catch (InterruptedException e) {
+                // Thread.sleep() interrupted... probably getting shut down
             }
-        } catch (InterruptedException e) {
-            // Thread.sleep() interrupted... probably getting shut down
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         session.closeSession();  // will also close producer and consumer objects
+        System.out.println("Main thread quitting.");
     }
 }
