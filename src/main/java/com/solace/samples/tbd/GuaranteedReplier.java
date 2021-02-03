@@ -53,17 +53,7 @@ public class GuaranteedReplier {
 
     /** Static inner class to keep code clean, used for handling ACKs/NACKs from broker **/
     private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
-        
-        @Override
-        public void responseReceived(String messageID) {
-            // deprecated, superseded by responseReceivedEx()
-        }
-        
-        @Override
-        public void handleError(String messageID, JCSMPException e, long timestamp) {
-            // deprecated, superseded by handleErrorEx()
-        }
-        
+
         @Override
         public void responseReceivedEx(Object key) {
             assert key != null;  // this shouldn't happen, this should only get called for an ACK
@@ -103,10 +93,10 @@ public class GuaranteedReplier {
 
     private static volatile boolean isShutdown = false;
 
-    public static void main(String... args) throws JCSMPException, IOException {
+    /** The main method. */
+    public static void main2b(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {   // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
         System.out.println(SAMPLE_NAME+" initializing...");
@@ -123,8 +113,9 @@ public class GuaranteedReplier {
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
+        final JCSMPSession session;
+        session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
                 System.out.printf("### Received a Session event: %s%n",event);

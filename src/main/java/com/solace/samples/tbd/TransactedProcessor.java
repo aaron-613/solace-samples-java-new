@@ -33,16 +33,16 @@ import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
-public class GuaranteedProcessor {
+public class TransactedProcessor {
 
     public void run(String... args) throws JCSMPException {
         System.out.println("DirectProcessor initializing...");
         final JCSMPProperties properties = new JCSMPProperties();
-        properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
-        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
-        properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
+        properties.setProperty(JCSMPProperties.HOST, args[0]);     // host:port
+        properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]); // message-vpn
+        properties.setProperty(JCSMPProperties.USERNAME, args[2]); // client-username
         if (args.length > 3) {
-            properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
+            properties.setProperty(JCSMPProperties.PASSWORD, args[3]); // client-password
         }
         final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties);
         session.connect();
@@ -118,7 +118,7 @@ public class GuaranteedProcessor {
 
     }
 
-    public static void main(String... args) throws JCSMPException {
+    public static void main2b(String... args) throws JCSMPException {
 
         // Check command line arguments
         if (args.length < 3) {
@@ -127,7 +127,7 @@ public class GuaranteedProcessor {
             System.exit(-1);
         }
 
-        GuaranteedProcessor processor = new GuaranteedProcessor();
+        TransactedProcessor processor = new TransactedProcessor();
         processor.run(args);
     }
 }

@@ -68,7 +68,7 @@ public class GuaranteedRequestorAsync {
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
 
-    public static void main(String... args) throws JCSMPException, IOException {
+    public static void main2b(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
