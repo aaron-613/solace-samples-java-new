@@ -45,7 +45,7 @@ public class DirectSubscriber {
     private static volatile boolean isShutdown = false;          // are we done yet?
 
     /** the main method. */
-    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
+    public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
@@ -72,12 +72,13 @@ public class DirectSubscriber {
                 System.out.printf("### Received a Session event: %s%n", event);
             }
         });
-        session.connect();
-        
+        session.connect();  // connect to the broker
+
         // Anonymous inner-class for MessageListener, this demonstrates the async threaded message callback
         final XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage message) {
+                // do not print anything to console... too slow!
                 msgRecvCounter++;
                 if (message.getDiscardIndication()) {  // since Direct messages, check if there have been any lost any messages
                     // If the consumer is being over-driven (i.e. publish rates too high), the broker might discard some messages for this consumer
@@ -90,25 +91,17 @@ public class DirectSubscriber {
                 }
                 // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
                 if (VERIFY_PAYLOAD_DATA) {
-                    //TODO: DO SEOMTHING ELSE HERE!!
-                    //  check for gaps in message sequence num..?
-                    // as set in the publisher code, the payload should be filled with the same character as the last letter of the topic
+                    // check for gaps in message sequence num..?
+                    // or (as set in publisher code) verify that the published topic ends with same char as in the payload
                     if (message instanceof BytesMessage && message.getAttachmentContentLength() > 0) {  // non-empty BytesMessage
-                        BytesMessage msg = (BytesMessage)message;  // cast the message (could also be TextMessage?)
-                        byte[] payload = msg.getData();        // get the payload
-                        char payloadChar = (char)payload[0];       // grab the first byte/char
-                        char lastTopicChar = message.getDestination().getName().charAt(message.getDestination().getName().length() - 1);
-                        if (payloadChar != lastTopicChar) {
-                            System.out.println("*** Topic vs. Payload discrepancy *** : didn't match! oh well!");
-                            VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
-                        }
+                        // do some stuff
                     } else {  // unexpected?
                         System.out.printf("vvv Received non-BytesMessage vvv%n%s%n",message.dump());  // just print
                         VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
                     }
                 }
                 if (message.getDestination().getName().endsWith("control/quit")) {  // special sample message
-                    System.out.println("QUIT message received, shutting down.");
+                    System.out.println("QUIT message received, shutting down.");  // exampe of command-and-control w/msgs
                     isShutdown = true;
                 }
             }
@@ -145,4 +138,3 @@ public class DirectSubscriber {
         session.closeSession();  // will also close consumer object
     }
 }
- 

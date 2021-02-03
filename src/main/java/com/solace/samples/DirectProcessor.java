@@ -79,24 +79,25 @@ public class DirectProcessor {
                 System.out.printf("### Received a Session event: %s%n", event);
             }
         });
-        session.connect();
+        session.connect();  // connect to the broker
 
         // Simple anonymous inner-class for handling publishing events
         final XMLMessageProducer producer;
         producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+            // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             @Override public void responseReceivedEx(Object key) {
-                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
 
             // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
                     isShutdown = true;
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
-                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx()) + ": " + e.getResponsePhrase());
+                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())
+                            + ": " + e.getResponsePhrase());
                     System.out.println(cause);
                 }
             }
@@ -135,7 +136,6 @@ public class DirectProcessor {
         });
 
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/pub/>"));  // listen to
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/control/>"));
         cons.start();
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
@@ -143,7 +143,7 @@ public class DirectProcessor {
             try {
                 Thread.sleep(1000);  // take a pause
             } catch (InterruptedException e) {
-                
+                // Thread.sleep() interrupted... probably getting shut down
             }
         }
         System.out.println("Main thread quitting.");

@@ -97,7 +97,8 @@ tasks.withType(JavaCompile).all {
     options.compilerArgs.add("-Xlint:all")
 }
 
-def scripts = ['DirectHelloWorldPubSub':'com.solace.samples.DirectHelloWorldPubSub',
+def scripts = [
+    'DirectHelloWorld':'com.solace.samples.DirectHelloWorld',
     'DirectProcessor':'com.solace.samples.DirectProcessor',
     'DirectPublisher':'com.solace.samples.DirectPublisher',
     'DirectReplier':'com.solace.samples.DirectReplier',

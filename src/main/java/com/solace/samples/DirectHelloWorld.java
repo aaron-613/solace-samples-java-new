@@ -44,13 +44,20 @@ public class DirectHelloWorld {
     private static volatile boolean isShutdown = false;           // are we done yet?
 
     /** Simple application for doing pubsub. */
-    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
+    public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME + " initializing...");
+        // User prompt, what is your name??, to use in the topic
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String uniqueName = "";
+        while (uniqueName.isEmpty()) {
+            System.out.printf("Hello! Enter your name, or a unique word: ");
+            uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
+        }
         
+        System.out.println(SAMPLE_NAME + " initializing...");
         // Build the properties object for initializing the JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -64,16 +71,17 @@ public class DirectHelloWorld {
         session.connect();  // connect to the broker
         
         // setup Producer callbacks config: simple anonymous inner-class for handling publishing events
-        XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+        final XMLMessageProducer producer;
+        producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+            // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             @Override public void responseReceivedEx(Object key) {
-                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
-            
+
             // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
                     isShutdown = true;
                 }
             }
@@ -88,7 +96,7 @@ public class DirectHelloWorld {
             }
 
             @Override
-            public void onException(JCSMPException e) {  // oh no!
+            public void onException(JCSMPException e) {  // uh oh!
                 System.out.printf("### MessageListener's onException(): %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
                     isShutdown = true;  // let's quit
@@ -96,14 +104,6 @@ public class DirectHelloWorld {
             }
         });
 
-        // User prompt, what is your name, to use in the topic
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String uniqueName = "solace";
-        while (uniqueName.isEmpty()) {
-            System.out.printf("Hello! Enter your name, or a unique word: ");
-            uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
-        }
-        
         // Ready to start the application, just add one subscription
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/hello/>"));    // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
@@ -111,12 +111,12 @@ public class DirectHelloWorld {
         System.out.printf(" - Run this sample twice to see true publish-subscribe. -%n%n");
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        while (System.in.available() == 0 && !isShutdown) {  // time to loop!
+        while (System.in.available() == 0 && !isShutdown) {  // time to loop, just use main thread
             try {
                 // specify a text payload
                 message.setText(String.format("Hello World from %s!",uniqueName));
                 // make a dynamic topic: solace/samples/hello/[uniqueName]
-                String topicString = String.format("%s/hello/%s", TOPIC_PREFIX, uniqueName);
+                String topicString = String.format("%s/hello/%s", TOPIC_PREFIX, uniqueName.toLowerCase());
                 System.out.printf(">> Calling send() on %s%n",topicString);
                 producer.send(message, JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it

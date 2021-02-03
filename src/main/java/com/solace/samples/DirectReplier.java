@@ -75,8 +75,8 @@ public class DirectReplier {
         // Anonymous inner-class for handling publishing events
         final XMLMessageProducer producer;
         producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+            // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             @Override public void responseReceivedEx(Object key) {
-                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
             
             // can be called for ACL violations, connection loss, and Persistent NACKs
