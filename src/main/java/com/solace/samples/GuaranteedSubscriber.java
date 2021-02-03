@@ -19,11 +19,6 @@
 
 package com.solace.samples;
 
-import java.io.IOException;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.FlowEventArgs;
@@ -40,9 +35,12 @@ import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageListener;
+import java.io.IOException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GuaranteedSubscriber {
-    
+
     private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
     private static final String QUEUE_NAME = "q_samples";
     
@@ -52,14 +50,13 @@ public class GuaranteedSubscriber {
 
     private static final Logger logger = LogManager.getLogger(GuaranteedSubscriber.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
-
+    /** This is the main app.  Use this type of app for receiving Guarnateed messages (e.g. via a queue endpoint). */
     public static void main(String... args) throws JCSMPException, InterruptedException, IOException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME+" initializing...");
+        System.out.println(SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -68,10 +65,11 @@ public class GuaranteedSubscriber {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }   
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        final JCSMPSession session;
+        session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                logger.info("### Received a Session event: %s%n",event);
+                logger.info("### Received a Session event: %s%n", event);
             }
         });
         session.connect();
@@ -91,16 +89,17 @@ public class GuaranteedSubscriber {
                 @Override
                 public void handleEvent(Object source, FlowEventArgs event) {
                     // Flow events are usually: active, reconnecting (i.e. unbound), reconnected
-                    logger.info("### Received a Flow event: %s%n",event);
+                    logger.info("### Received a Flow event: %s%n", event);
                 }
             });
         } catch (OperationNotSupportedException e) {  // not allowed to do this
             throw e;
         } catch (JCSMPErrorResponseException e) {  // something else went wrong: queue not exist, queue shutdown, etc.
             logger.error(e);
-            System.out.printf("Could not establish a connection to queue %s: %s%n",QUEUE_NAME,e.getCause());
+            System.out.printf("%nCould not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
             System.out.println("Ensure queue exists using PubSub+ Manager WebGUI, or see the scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
+            System.out.println("NOTE: see GuaranteedQueueProvision sample for how to construct queue with consumer app.");
             System.out.println("Exiting.");
             return;
         }
@@ -110,7 +109,7 @@ public class GuaranteedSubscriber {
         try {
             while (System.in.available() == 0 && !isShutdown) {
                 Thread.sleep(1000);  // wait 1 second
-                System.out.printf("Received msgs/s: %,d%n",msgRecvCounter);  // simple way of calculating message rates
+                System.out.printf("Received msgs/s: %,d%n", msgRecvCounter);  // simple way of calculating message rates
                 msgRecvCounter = 0;
                 if (hasDetectedRedelivery) {
                     System.out.println("*** Redelivery detected ***");
@@ -120,14 +119,16 @@ public class GuaranteedSubscriber {
         } catch (InterruptedException e) {
             // Thread.sleep() interrupted... probably getting shut down
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         flowQueueReceiver.stop();
         Thread.sleep(1000);
         session.closeSession();  // will also close consumer object
+        System.out.println("Main thread quitting.");
     }
-    
-    /** Very simple static inner class, used for receives messages from Queue Flows **/
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    /** Very simple static inner class, used for receives messages from Queue Flows. **/
     private static class QueueFlowListener implements XMLMessageListener {
 
         @Override
@@ -147,7 +148,7 @@ public class GuaranteedSubscriber {
 
         @Override
         public void onException(JCSMPException e) {
-            logger.warn("### Queue "+QUEUE_NAME+" Flow handler received exception", e);
+            logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception", e);
             if (e instanceof JCSMPTransportException) {
                 isShutdown = true;  // let's quit
             }
