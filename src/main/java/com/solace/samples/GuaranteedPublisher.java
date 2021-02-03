@@ -50,17 +50,7 @@ public class GuaranteedPublisher {
     
     /** Very simple static inner class, used for handling ACKs/NACKs from broker **/
     private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
-        
-        @Override @SuppressWarnings("deprecation")
-        public void responseReceived(String messageID) {
-            // deprecated, superseded by responseReceivedEx()
-        }
-        
-        @Override @SuppressWarnings("deprecation")
-        public void handleError(String messageID, JCSMPException e, long timestamp) {
-            // deprecated, superseded by handleErrorEx()
-        }
-        
+
         @Override
         public void responseReceivedEx(Object key) {
             assert key != null;  // this shouldn't happen, this should only get called for an ACK
@@ -72,7 +62,7 @@ public class GuaranteedPublisher {
         public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
             if (key != null) {  // NACK
                 assert key instanceof BytesXMLMessage;
-                logger.warn(String.format("NACK for Message %s",key));
+                logger.warn(String.format("NACK for Message %s",key),cause);
                 // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
                 //  - send the message again
                 //  - send it somewhere else (error handling queue?)
@@ -107,7 +97,7 @@ public class GuaranteedPublisher {
     
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n",SAMPLE_NAME);
             System.out.println();
             System.exit(-1);
         }

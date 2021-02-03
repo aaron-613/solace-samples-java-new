@@ -71,7 +71,6 @@ sourceSets {
     main {
         java {
             srcDir 'src/main/java'
-            exclude '**/Guaran*'
             exclude '**/Blah.java'
        }
        // Used to pick up resources at the root of the application directory

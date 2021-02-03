@@ -42,34 +42,6 @@ import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageListener;
 
 public class GuaranteedSubscriber {
-
-    /** Very simple static inner class, used for receives messages from Queue Flows **/
-    private static class QueueFlowListener implements XMLMessageListener {
-
-        @Override
-        public void onReceive(BytesXMLMessage msg) {
-            msgRecvCounter++;
-            if (msg.getRedelivered()) {
-                // this is the broker telling the consumer that this message
-                // has been sent and not ACKnowledge before
-                // perhaps an error in processing? Should do extra checks to avoid duplicate processing
-                hasDetectedRedelivery = true;
-            }
-            // Messages are removed from the broker queue when the ACK is received.
-            // Therefore, do not ACK until all processing/storing of this message is complete.
-            // NOTE that messages can be acknowledged from a different thread.
-            msg.ackMessage();
-        }
-
-        @Override
-        public void onException(JCSMPException e) {
-            logger.warn("### Queue "+QUEUE_NAME+" Flow handler received exception", e);
-            if (e instanceof JCSMPTransportException) {
-                isShutdown = true;  // let's quit
-            }
-        }
-    }
-    
     
     private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
     private static final String QUEUE_NAME = "q_samples";
@@ -125,12 +97,14 @@ public class GuaranteedSubscriber {
         } catch (OperationNotSupportedException e) {  // not allowed to do this
             throw e;
         } catch (JCSMPErrorResponseException e) {  // something else went wrong: queue not exist, queue shutdown, etc.
-            logger.error("Could not establish a connection to queue "+QUEUE_NAME+": "+e.toString());
-            logger.error("Ensure queue exists using PubSub+ Manager WebGUI, or see the scripts inside the 'semp-rest-api' directory.");
+            logger.error(e);
+            System.out.printf("Could not establish a connection to queue %s: %s%n",QUEUE_NAME,e.getCause());
+            System.out.println("Ensure queue exists using PubSub+ Manager WebGUI, or see the scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
+            System.out.println("Exiting.");
             return;
         }
-        
+        // tell the broker to start sending messages on this queue receiver
         flowQueueReceiver.start();
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
@@ -151,5 +125,32 @@ public class GuaranteedSubscriber {
         flowQueueReceiver.stop();
         Thread.sleep(1000);
         session.closeSession();  // will also close consumer object
+    }
+    
+    /** Very simple static inner class, used for receives messages from Queue Flows **/
+    private static class QueueFlowListener implements XMLMessageListener {
+
+        @Override
+        public void onReceive(BytesXMLMessage msg) {
+            msgRecvCounter++;
+            if (msg.getRedelivered()) {  // useful check
+                // this is the broker telling the consumer that this message has been sent and not ACKed before.
+                // this can happen if an exception is thrown, or the broker restarts, or the netowrk disconnects
+                // perhaps an error in processing? Should do extra checks to avoid duplicate processing
+                hasDetectedRedelivery = true;
+            }
+            // Messages are removed from the broker queue when the ACK is received.
+            // Therefore, DO NOT ACK until all processing/storing of this message is complete.
+            // NOTE that messages can be acknowledged from a different thread.
+            msg.ackMessage();  // ACKs are asynchronous
+        }
+
+        @Override
+        public void onException(JCSMPException e) {
+            logger.warn("### Queue "+QUEUE_NAME+" Flow handler received exception", e);
+            if (e instanceof JCSMPTransportException) {
+                isShutdown = true;  // let's quit
+            }
+        }
     }
 }
