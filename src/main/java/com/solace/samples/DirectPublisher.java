@@ -148,8 +148,8 @@ public class DirectPublisher {
         } catch (InterruptedException e) {
             // Thread.sleep() interrupted... probably getting shut down
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         session.closeSession();  // will also close producer object
+        System.out.println("Main thread quitting.");
     }
 }

@@ -146,8 +146,8 @@ public class DirectProcessor {
                 // Thread.sleep() interrupted... probably getting shut down
             }
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         session.closeSession();  // will also close producer and consumer objects
+        System.out.println("Main thread quitting.");
     }
 }

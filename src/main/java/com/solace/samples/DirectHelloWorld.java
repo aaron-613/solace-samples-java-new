@@ -113,6 +113,7 @@ public class DirectHelloWorld {
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (System.in.available() == 0 && !isShutdown) {  // time to loop, just use main thread
             try {
+                Thread.sleep(5000);  // take a pause
                 // specify a text payload
                 message.setText(String.format("Hello World from %s!",uniqueName));
                 // make a dynamic topic: solace/samples/hello/[uniqueName]
@@ -120,7 +121,6 @@ public class DirectHelloWorld {
                 System.out.printf(">> Calling send() on %s%n",topicString);
                 producer.send(message, JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it
-                Thread.sleep(5000);  // take a pause
             } catch (JCSMPException e) {
                 System.out.printf("### Exception caught during producer.send(): %s%n",e);
                 if (e instanceof JCSMPTransportException) {  // unrecoverable
@@ -130,8 +130,8 @@ public class DirectHelloWorld {
                 // Thread.sleep() interrupted... probably getting shut down
             }
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         session.closeSession();  // will also close producer and consumer objects
+        System.out.println("Main thread quitting.");
     }
 }

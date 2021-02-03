@@ -133,8 +133,8 @@ public class DirectSubscriber {
         } catch (InterruptedException e) {
             // Thread.sleep() interrupted... probably getting shut down
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         session.closeSession();  // will also close consumer object
+        System.out.println("Main thread quitting.");
     }
 }
