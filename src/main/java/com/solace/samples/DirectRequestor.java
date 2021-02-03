@@ -44,7 +44,7 @@ public class DirectRequestor {
 
     private static final String SAMPLE_NAME = DirectRequestor.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int REQUEST_TIMEOUT_MS = 5000;  // time to wait for a reply before timing out
+    private static final int REQUEST_TIMEOUT_MS = 1000;  // time to wait for a reply before timing out
 
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
@@ -105,7 +105,7 @@ public class DirectRequestor {
             try {
                 requestMsg.setText(String.format("Hello, this is reqeust #%d", msgSentCounter));
                 Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/request");
-                System.out.printf("About to send request message #%d to topic '%s'...%n", msgSentCounter, topic.getName());
+                System.out.printf(">> About to send request message #%d to topic '%s'...%n", msgSentCounter, topic.getName());
                 Requestor requestor = session.createRequestor();  // create the useful Requestor object, Direct only
                 BytesXMLMessage replyMsg = requestor.request(requestMsg, REQUEST_TIMEOUT_MS, topic);  // send and receive in one call
                 msgSentCounter++;  // add one
