@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples;
+package com.solace.samples.tbd;
 
 import java.io.IOException;
 
