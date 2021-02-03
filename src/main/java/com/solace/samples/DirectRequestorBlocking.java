@@ -40,9 +40,9 @@ import java.io.IOException;
 /** Direct Messaging sample to demonstrate initiating a request-reply flow.
  *  Makes use of the blocking convenience function Requestor.request();
  */
-public class DirectRequestor {
+public class DirectRequestorBlocking {
 
-    private static final String SAMPLE_NAME = DirectRequestor.class.getSimpleName();
+    private static final String SAMPLE_NAME = DirectRequestorBlocking.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static final int REQUEST_TIMEOUT_MS = 1000;  // time to wait for a reply before timing out
 
