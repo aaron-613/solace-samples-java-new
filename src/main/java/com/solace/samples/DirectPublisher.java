@@ -102,7 +102,7 @@ public class DirectPublisher {
                 }
             }
         });
-        
+
         ExecutorService publishExecutor = Executors.newSingleThreadExecutor();
         publishExecutor.submit(() -> {  // create an application thread for publishing in a loop
             // preallocate a binary message, reuse it each loop, for performance
