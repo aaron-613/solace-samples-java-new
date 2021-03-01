@@ -1,6 +1,7 @@
 # solace-samples-jcsmp
 
 These are Aaron's updates to the Solace samples. These will be rolled into the main repository soon.
+Don't worry about all the warnings when you compile, those are getting changed.
 
 ## TO COMPILE
 ```
