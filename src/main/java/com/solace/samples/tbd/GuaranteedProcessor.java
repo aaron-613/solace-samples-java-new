@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples;
+package com.solace.samples.tbd;
 
 import java.io.IOException;
 
@@ -118,7 +118,7 @@ public class GuaranteedProcessor {
 
     }
 
-    public static void main(String... args) throws JCSMPException {
+    public static void main2b(String... args) throws JCSMPException {
 
         // Check command line arguments
         if (args.length < 3) {

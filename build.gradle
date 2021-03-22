@@ -3,10 +3,11 @@ plugins {
     id 'application'
     id 'idea'
     id 'eclipse'
+    id 'checkstyle'
 }
 
 
-// Don't need these task, so disabling them. Makes it possible to avoid
+// Don't need these tasks, so disabling them. Makes it possible to avoid
 // declaring a single application main class.
 startScripts.enabled = false
 run.enabled = false
@@ -56,7 +57,7 @@ repositories {
 
 dependencies {
     // Solace Messaging API for Java Dependencies
-    implementation group: 'com.solacesystems', name: 'sol-jcsmp', version: '10.9.0'
+    implementation group: 'com.solacesystems', name: 'sol-jcsmp', version: '10.10.0'
     // new an improved logging framework, no more slf4j
     implementation group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.11.1'
     implementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.11.1'
@@ -80,6 +81,11 @@ sourceSets {
    }
 }
 
+checkstyle {
+    configFile file('config/checkstyle/checkstyle.xml');
+    toolVersion '8.27';
+}
+
 
 // unused, so commenting out (Issue #58)
 //task createAllStartScripts() << {
@@ -90,7 +96,8 @@ tasks.withType(JavaCompile).all {
     options.compilerArgs.add("-Xlint:all")
 }
 
-def scripts = ['DirectHelloWorldPubSub':'com.solace.samples.DirectHelloWorldPubSub',
+def scripts = [
+    'DirectHelloWorld':'com.solace.samples.DirectHelloWorld',
     'DirectProcessor':'com.solace.samples.DirectProcessor',
     'DirectPublisher':'com.solace.samples.DirectPublisher',
     'DirectReplier':'com.solace.samples.DirectReplier',

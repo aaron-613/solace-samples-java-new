@@ -19,13 +19,6 @@
 
 package com.solace.samples;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.UUID;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
@@ -45,52 +38,15 @@ import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class GuaranteedPublisher {
-    
-    /** Very simple static inner class, used for handling ACKs/NACKs from broker **/
-    private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
-        
-        @Override @SuppressWarnings("deprecation")
-        public void responseReceived(String messageID) {
-            // deprecated, superseded by responseReceivedEx()
-        }
-        
-        @Override @SuppressWarnings("deprecation")
-        public void handleError(String messageID, JCSMPException e, long timestamp) {
-            // deprecated, superseded by handleErrorEx()
-        }
-        
-        @Override
-        public void responseReceivedEx(Object key) {
-            assert key != null;  // this shouldn't happen, this should only get called for an ACK
-            assert key instanceof BytesXMLMessage;
-            logger.debug(String.format("ACK for Message %s",key));  // good enough, the broker has it now
-        }
-
-        @Override
-        public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-            if (key != null) {  // NACK
-                assert key instanceof BytesXMLMessage;
-                logger.warn(String.format("NACK for Message %s",key));
-                // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
-                //  - send the message again
-                //  - send it somewhere else (error handling queue?)
-                //  - log and continue
-                //  - pause and retry (backuoff)
-                //  - attempt to rollback state, send a different message ot reset?
-            } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
-                logger.warn("### Producer handleErrorEx() callback: %s%n",cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
-                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
-                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
-                    logger.warn("Specifics: " + JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
-                }
-            }
-        }
-    }
-    //////////////////////////////////////////////////////
     
     private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
@@ -103,15 +59,15 @@ public class GuaranteedPublisher {
 
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
-    
-    
+
+    /** Main. */
     public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.out.println();
             System.exit(-1);
         }
-        logger.info(SAMPLE_NAME+" initializing...");
+        logger.info(SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -120,82 +76,114 @@ public class GuaranteedPublisher {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE,PUBLISH_WINDOW_SIZE);
+        properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE, PUBLISH_WINDOW_SIZE);
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
+        final JCSMPSession session;
+        session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                logger.info("### Received a Session event: %s%n",event);
+                logger.info("### Received a Session event: %s%n", event);
             }
         });
         session.connect();
         
         XMLMessageProducer producer = session.getMessageProducer(new PublishCallbackHandler(), new JCSMPProducerEventHandler() {
-        @Override
-        public void handleEvent(ProducerEventArgs event) {
-            // as of Oct 2020, this event only occurs when republishing unACKed messages on an unknown flow
-                logger.info("*** Received a producer event: "+event);
+            @Override
+            public void handleEvent(ProducerEventArgs event) {
+                // as of v10.10, this event only occurs when republishing unACKed messages on an unknown flow
+                logger.info("*** Received a producer event: " + event);
             }
         });
 
-        Runnable pubThread = new Runnable() {
-            @Override
-            public void run() {
-                byte[] payload = new byte[PAYLOAD_SIZE];
-                try {
-                    while (!isShutdown) {
-                        BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
-                        // each loop, change the payload
-                        char chosenCharacter = (char)(Math.round(System.nanoTime()%26)+65);  // choose a "random" letter [A-Z]
-                        Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
-                        // use a BytesMessage this sample, instead of TextMessage
-                        message.setData(payload);
-                        message.setDeliveryMode(DeliveryMode.PERSISTENT);  // required for Guaranteed
-                        message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
-                        // as another example, let's define a user property!
-                        SDTMap map = JCSMPFactory.onlyInstance().createMap();
-                        map.putString("sample","JCSMP GuaranteedPublisher");
-                        message.setProperties(map);
-                        message.setCorrelationKey(message);  // used for ACK/NACK correlation locally within the API
-                        //message.setAckImmediately(true);
-                        String topicString = new StringBuilder(TOPIC_PREFIX).append("/pers/pub/").append(chosenCharacter).toString();
-                        Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
-                        producer.send(message,topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
-                        msgSentCounter++;
-                        try {
-                            //Thread.sleep(0);
-                            Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
-                            // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
-                        } catch (InterruptedException e) {
-                            isShutdown = true;
-                        }
-
+        ExecutorService publishThread = Executors.newSingleThreadExecutor();
+        publishThread.submit(() -> {
+            byte[] payload = new byte[PAYLOAD_SIZE];
+            try {
+                while (!isShutdown) {
+                    BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+                    // each loop, change the payload
+                    char chosenCharacter = (char)(Math.round(msgSentCounter % 26) + 65);  // choose a "random" letter [A-Z]
+                    Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
+                    // use a BytesMessage this sample, instead of TextMessage
+                    message.setData(payload);
+                    message.setDeliveryMode(DeliveryMode.PERSISTENT);  // required for Guaranteed
+                    message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example
+                    // as another example, let's define a user property!
+                    SDTMap map = JCSMPFactory.onlyInstance().createMap();
+                    map.putString("sample","JCSMP GuaranteedPublisher");
+                    message.setProperties(map);
+                    message.setCorrelationKey(message);  // used for ACK/NACK correlation locally within the API
+                    //message.setAckImmediately(true);
+                    String topicString = new StringBuilder(TOPIC_PREFIX).append("/pers/pub/").append(chosenCharacter).toString();
+                    Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
+                    producer.send(message, topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
+                    msgSentCounter++;
+                    try {
+                        //Thread.sleep(0);
+                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
+                    } catch (InterruptedException e) {
+                        isShutdown = true;
                     }
-                } catch (JCSMPException e) {
-                    e.printStackTrace();
-                } finally {
-                    logger.info("Publisher Thread shutdown");
+
                 }
+            } catch (JCSMPException e) {
+                e.printStackTrace();
+            } finally {
+                logger.info("Publisher Thread shutdown");
             }
-        };
-        Thread t = new Thread(pubThread,"Publisher Thread");
-        t.setDaemon(true);
-        t.start();
+        });
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
         while (System.in.available() == 0 && !isShutdown) {
             Thread.sleep(1000);
-            System.out.printf("Published msgs/s: %,d%n",msgSentCounter);  // simple way of calculating message rates
+            System.out.printf("Published msgs/s: %,d%n", msgSentCounter);  // simple way of calculating message rates
             msgSentCounter = 0;
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         Thread.sleep(1500);  // give time for the ACKs to arrive from the broker
         session.closeSession();
+        System.out.println("Main thread quitting.");
     }
+
+    ////////////////////////////////////////////////////////////////////////////
+    
+    /** Very simple static inner class, used for handling ACKs/NACKs from broker. **/
+    private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
+
+        @Override
+        public void responseReceivedEx(Object key) {
+            assert key != null;  // this shouldn't happen, this should only get called for an ACK
+            assert key instanceof BytesXMLMessage;
+            logger.debug(String.format("ACK for Message %s", key));  // good enough, the broker has it now
+        }
+        
+        @Override
+        public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+            if (key != null) {  // NACK
+                assert key instanceof BytesXMLMessage;
+                logger.warn(String.format("NACK for Message %s", key), cause);
+                // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
+                //  - send the message again
+                //  - send it somewhere else (error handling queue?)
+                //  - log and continue
+                //  - pause and retry (backuoff)
+                //  - attempt to rollback state, send a different message ot reset?
+            } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
+                logger.warn("### Producer handleErrorEx() callback: %s%n", cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdown = true;
+                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
+                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
+                    logger.warn("Specifics: " + JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx()) + ": " + e.getResponsePhrase());
+                }
+            }
+        }
+    }
+
 }

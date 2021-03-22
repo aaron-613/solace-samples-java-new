@@ -19,8 +19,6 @@
 
 package com.solace.samples;
 
-import java.io.IOException;
-
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
@@ -33,27 +31,26 @@ import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
+import java.io.IOException;
 
-/**
- * This is a more detailed subscriber sample
- */
+/** This is a more detailed subscriber sample. */
 public class DirectSubscriber {
 
     private static final String SAMPLE_NAME = DirectSubscriber.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
-    private static boolean VERIFY_PAYLOAD_DATA = true;           // should we do some "processing" of incoming messages? (just for example)
+    private static boolean VERIFY_PAYLOAD_DATA = true;           // should we do some processing of incoming messages?
     private static volatile int msgRecvCounter = 0;              // num messages received
     private static volatile boolean hasDetectedDiscard = false;  // detected any discards yet?
     private static volatile boolean isShutdown = false;          // are we done yet?
 
-    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
+    /** the main method. */
+    public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME+" initializing...");
+        System.out.println(SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -62,25 +59,26 @@ public class DirectSubscriber {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // subscribe Direct subs after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
+        final JCSMPSession session;
+        session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                System.out.printf("### Received a Session event: %s%n",event);
+                System.out.printf("### Received a Session event: %s%n", event);
             }
         });
-        session.connect();
-        
-        /** Anonymous inner-class for MessageListener
-         *  This demonstrates the async threaded message callback */
+        session.connect();  // connect to the broker
+
+        // Anonymous inner-class for MessageListener, this demonstrates the async threaded message callback
         final XMLMessageConsumer consumer = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage message) {
+                // do not print anything to console... too slow!
                 msgRecvCounter++;
                 if (message.getDiscardIndication()) {  // since Direct messages, check if there have been any lost any messages
                     // If the consumer is being over-driven (i.e. publish rates too high), the broker might discard some messages for this consumer
@@ -93,25 +91,17 @@ public class DirectSubscriber {
                 }
                 // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
                 if (VERIFY_PAYLOAD_DATA) {
-//TODO: DO SEOMTHING ELSE HERE!!
-//  check for gaps in message sequence num..?
-                    // as set in the publisher code, the payload should be filled with the same character as the last letter of the topic
+                    // check for gaps in message sequence num..?
+                    // or (as set in publisher code) verify that the published topic ends with same char as in the payload
                     if (message instanceof BytesMessage && message.getAttachmentContentLength() > 0) {  // non-empty BytesMessage
-                        BytesMessage msg = (BytesMessage)message;  // cast the message (could also be TextMessage?)
-                        byte[] payload = msg.getData();        // get the payload
-                        char payloadChar = (char)payload[0];       // grab the first byte/char
-                        char lastTopicChar = message.getDestination().getName().charAt(message.getDestination().getName().length()-1);
-                        if (payloadChar != lastTopicChar) {
-                            System.out.println("*** Topic vs. Payload discrepancy *** : didn't match! oh well!");
-                            VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
-                        }
+                        // do some stuff
                     } else {  // unexpected?
                         System.out.printf("vvv Received non-BytesMessage vvv%n%s%n",message.dump());  // just print
                         VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
                     }
                 }
                 if (message.getDestination().getName().endsWith("control/quit")) {  // special sample message
-                    System.out.println("QUIT message received, shutting down.");
+                    System.out.println("QUIT message received, shutting down.");  // exampe of command-and-control w/msgs
                     isShutdown = true;
                 }
             }
@@ -125,8 +115,8 @@ public class DirectSubscriber {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/direct/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"/control/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/control/>"));
         consumer.start();
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
@@ -135,15 +125,16 @@ public class DirectSubscriber {
                 System.out.printf("Received msgs/s: %,d%n",msgRecvCounter);  // simple way of calculating message rates
                 msgRecvCounter = 0;
                 if (hasDetectedDiscard) {
-                    System.out.println("*** Egress discard detected *** : "+SAMPLE_NAME+" unable to keep up with full message rate");
+                    System.out.println("*** Egress discard detected *** : "
+                            + SAMPLE_NAME + " unable to keep up with full message rate");
                     hasDetectedDiscard = false;  // only show the error once per second
                 }
             }
         } catch (InterruptedException e) {
             // Thread.sleep() interrupted... probably getting shut down
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         session.closeSession();  // will also close consumer object
+        System.out.println("Main thread quitting.");
     }
 }

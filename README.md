@@ -1,7 +1,19 @@
 # solace-samples-jcsmp
 
-These few samples are the starting point of the proposed way of presenting Solace samples.
+These are Aaron's updates to the Solace samples. These will be rolled into the main repository soon.
+Don't worry about all the warnings when you compile, those are getting changed.
 
+## TO COMPILE
+```
+./gradlew assemble
+```
+
+## TO RUN
+```
+cd build/staged
+bin/DirectSubscriber
+bin/DirectPublisher
+```
 
 ## Fundamentals
 These will be proper little messaging applications, looping, publishing multiple messages, using subscriptions w/wildcards, and at least logging or echoing errors and API events to the console.

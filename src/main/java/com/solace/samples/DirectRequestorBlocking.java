@@ -21,35 +21,33 @@ package com.solace.samples;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
-import com.solacesystems.jcsmp.JCSMPErrorResponseException;
-import com.solacesystems.jcsmp.JCSMPErrorResponseSubcodeEx;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
+import com.solacesystems.jcsmp.JCSMPRequestTimeoutException;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
+import com.solacesystems.jcsmp.Requestor;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.TextMessage;
+import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
-import com.solacesystems.jcsmp.XMLMessageProducer;
 import java.io.IOException;
 
-/**
- * A Processor is a microservice or application that receives a message, does something with the info,
- * and then sends it on..!  It is both a publisher and a subscriber, but (mainly) publishes data once
- * it has received an input message.
- * This class is meant to be used with DirectPub and DirectSub, intercepting the published messages and
- * sending them on to a different topic.
+/** Direct Messaging sample to demonstrate initiating a request-reply flow.
+ *  Makes use of the blocking convenience function Requestor.request();
  */
-public class DirectProcessor {
+public class DirectRequestorBlocking {
 
-    private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
+    private static final String SAMPLE_NAME = DirectRequestorBlocking.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    
-    private static volatile boolean isShutdown = false;  // are we done yet?
+    private static final int REQUEST_TIMEOUT_MS = 1000;  // time to wait for a reply before timing out
+
+    private static volatile int msgSentCounter = 0;                   // num messages sent
+    private static volatile boolean isShutdown = false;
 
     /** Main method. */
     public static void main(String... args) throws JCSMPException, IOException {
@@ -66,7 +64,7 @@ public class DirectProcessor {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe Direct subs after reconnect
+        properties.setProperty(JCSMPProperties.REAPPLY_SUBSCRIPTIONS, true);  // re-subscribe after reconnect
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
@@ -82,8 +80,7 @@ public class DirectProcessor {
         session.connect();  // connect to the broker
 
         // Simple anonymous inner-class for handling publishing events
-        final XMLMessageProducer producer;
-        producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+        session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             @Override public void responseReceivedEx(Object key) {
             }
@@ -94,54 +91,34 @@ public class DirectProcessor {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
                     isShutdown = true;
-                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
-                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
-                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())
-                            + ": " + e.getResponsePhrase());
-                    System.out.println(cause);
                 }
             }
         });
-
-        // Simple anonymous inner-class for request handling
-        final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
-            @Override
-            public void onReceive(BytesXMLMessage inboundMsg) {
-                if (inboundMsg.getDestination().getName().startsWith(TOPIC_PREFIX + "/direct/pub")) {
-                    // how to process the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
-                    TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-                    final String upperCaseMessage = inboundMsg.dump().toUpperCase();  // as a silly example of "processing"
-                    outboundMsg.setText(upperCaseMessage);
-                    if (inboundMsg.getApplicationMessageId() != null) {
-                        outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
-                    }
-                    String [] inboundTopicLevels = inboundMsg.getDestination().getName().split("/");
-                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundTopicLevels[4]).toString();
-                    try {
-                        producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
-                    } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
-                        System.out.printf("### Caught while trying to producer.send(): %s%n",e);
-                        if (e instanceof JCSMPTransportException) {  // unrecoverable
-                            isShutdown = true;
-                        }
-                    }
-                } else {  // wasn't expecting this..?
-                    System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",inboundMsg.dump());  // just print
-                }
-            }
-
-            public void onException(JCSMPException e) {
-                System.out.printf("Consumer received exception: %s%n", e);
-            }
-        });
-
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/pub/>"));  // listen to
-        cons.start();
+        
+        // less common use of SYNChronous consumer mode (null callback)
+        final XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);
+        consumer.start();  // needed to receive the responses
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
-        while (System.in.available() == 0 && !isShutdown) {  // time to loop!
+        TextMessage requestMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+        while (System.in.available() == 0 && !isShutdown) {
             try {
-                Thread.sleep(1000);  // take a pause
+                requestMsg.setText(String.format("Hello, this is reqeust #%d", msgSentCounter));
+                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/request");
+                System.out.printf(">> About to send request message #%d to topic '%s'...%n", msgSentCounter, topic.getName());
+                Requestor requestor = session.createRequestor();  // create the useful Requestor object, Direct only
+                BytesXMLMessage replyMsg = requestor.request(requestMsg, REQUEST_TIMEOUT_MS, topic);  // send and receive in one call
+                msgSentCounter++;  // add one
+                System.out.printf("Response Message Dump:%n%s%n", replyMsg.dump());
+                requestMsg.reset();  // reuse this message, to avoid having to recreate it: better performance
+                Thread.sleep(1000);  // approx. one request per second
+            } catch (JCSMPRequestTimeoutException e) {
+                System.out.println("Failed to receive a reply in " + REQUEST_TIMEOUT_MS + " msecs");
+            } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
+                System.out.printf("### Caught while trying to producer.send(): %s%n", e);
+                if (e instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdown = true;
+                }
             } catch (InterruptedException e) {
                 // Thread.sleep() interrupted... probably getting shut down
             }

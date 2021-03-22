@@ -19,10 +19,6 @@
 
 package com.solace.samples;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.UUID;
-
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPErrorResponseException;
@@ -36,84 +32,86 @@ import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * A more performant sample that shows an application that publishes.
  */
 public class DirectPublisher {
     
-	private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
+    private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 100;
-	
+    
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
 
-    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
+    /** Main method. */
+    public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME+" initializing...");
+        System.out.println(SAMPLE_NAME + " initializing...");
 
-        // Build the properties object for initializing the JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
         properties.setProperty(JCSMPProperties.VPN_NAME,  args[1]);     // message-vpn
         properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
-        if (args.length > 3) { 
+        if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS,true);  // why not?
+        properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS, true);  // why not?
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
-        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES,channelProps);
-        final JCSMPSession session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
+        final JCSMPSession session;
+        session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                System.out.printf("### Received a Session event: %s%n",event);
+                System.out.printf("### Received a Session event: %s%n", event);
             }
         });
-        session.connect();
+        session.connect();  // connect to the broker
 
-        /** Anonymous inner-class for handling publishing events */
-        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
-            @Override @SuppressWarnings("deprecation")
-            public void responseReceived(String messageID) {
-                // deprecated, superseded by responseReceivedEx()
-            }
-            @Override @SuppressWarnings("deprecation")
-            public void handleError(String messageID, JCSMPException e, long timestamp) {
-                // deprecated, superseded by handleErrorEx()
-            }
+        // Simple anonymous inner-class for handling publishing events
+        final XMLMessageProducer producer;
+        producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
+            // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             @Override public void responseReceivedEx(Object key) {
-                // unused in Direct Messaging application, only for Guaranteed/Persistent publishing application
             }
+
             // can be called for ACL violations, connection loss, and Persistent NACKs
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
                     isShutdown = true;
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
-                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
+                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())
+                            + ": " + e.getResponsePhrase());
                     System.out.println(cause);
                 }
             }
         });
-        
-        Runnable pubThread = () -> {  // create an application thread for publishing in a loop
-            BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);  // preallocate a binary message
-            byte[] payload = new byte[PAYLOAD_SIZE];  // preallocate, for reuse
+
+        ExecutorService publishExecutor = Executors.newSingleThreadExecutor();
+        publishExecutor.submit(() -> {  // create an application thread for publishing in a loop
+            // preallocate a binary message, reuse it each loop, for performance
+            final BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
+            byte[] payload = new byte[PAYLOAD_SIZE];  // preallocate memory, for reuse, for performance
             while (!isShutdown) {
                 try {
-                    // each loop, change the payload
-                    char chosenCharacter = (char)(Math.round(System.nanoTime()%26)+65);  // choose a "random" letter [A-Z]
+                    // each loop, change the payload, less trivial
+                    char chosenCharacter = (char)(Math.round(msgSentCounter % 26) + 65);  // rotate through letters [A-Z]
                     Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
                     message.setData(payload);
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
@@ -124,7 +122,7 @@ public class DirectPublisher {
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
                     try {
                         //Thread.sleep(0);
-                        Thread.sleep(1000/APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;
@@ -136,20 +134,22 @@ public class DirectPublisher {
                     }
                 }
             }
-        };
-        Thread t = new Thread(pubThread,"Publisher Thread");
-        t.setDaemon(true);
-        t.start();
+            publishExecutor.shutdown();
+        });
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
         while (System.in.available() == 0 && !isShutdown) {
-            Thread.sleep(1000);
-            System.out.printf("Published msgs/s: %,d%n",msgSentCounter);  // simple way of calculating message rates
-            msgSentCounter = 0;
+            try {
+                Thread.sleep(1000);
+                System.out.printf("Published msgs/s: %,d%n",msgSentCounter);  // simple way of calculating message rates
+                msgSentCounter = 0;
+            } catch (InterruptedException e) {
+                // Thread.sleep() interrupted... probably getting shut down
+            }
         }
-        System.out.println("Main thread quitting.");
         isShutdown = true;
         session.closeSession();  // will also close producer object
+        System.out.println("Main thread quitting.");
     }
 }

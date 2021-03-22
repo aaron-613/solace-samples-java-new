@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples;
+package com.solace.samples.tbd;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -167,7 +167,7 @@ public class GuaranteedPublisherAckTrack {
     private static volatile boolean isShutdown = false;
     
     
-    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
+    public static void main2b(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",SAMPLE_NAME);
             System.out.println();

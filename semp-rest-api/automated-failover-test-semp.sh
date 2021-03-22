@@ -2,7 +2,7 @@
 
 # https://docs.solace.com/API-Developer-Online-Ref-Documentation/swagger-ui/config/index.html
 
-ROUTER=localhost:8081
+ROUTER=localhost:8080
 ADMIN_USER=admin
 ADMIN_PW=admin
 VPN=default

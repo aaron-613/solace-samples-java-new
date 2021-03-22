@@ -25,7 +25,7 @@
  * under the License.
  */
 
-package com.solace.samples;
+package com.solace.samples.tbd;
 
 import java.io.IOException;
 
@@ -50,71 +50,27 @@ import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.Topic;
+import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 /** Guaranteed Messaging sample to demonstrate initiating a request-reply flow.
  *  Not entirely 
  */
-public class GuaranteedRequestor {
+public class GuaranteedRequestorAsync {
     
-    /** Static inner class to keep code clean, used for handling ACKs/NACKs from broker **/
-    private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
-        
-        @Override
-        public void responseReceived(String messageID) {
-            // deprecated, superseded by responseReceivedEx()
-        }
-        
-        @Override
-        public void handleError(String messageID, JCSMPException e, long timestamp) {
-            // deprecated, superseded by handleErrorEx()
-        }
-        
-        @Override
-        public void responseReceivedEx(Object key) {
-            assert key != null;  // this shouldn't happen, this should only get called for an ACK
-            assert key instanceof BytesXMLMessage;
-            logger.debug(String.format("ACK for Message %s",key));  // good enough, the broker has it now
-        }
-
-        @Override
-        public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
-            if (key != null) {  // NACK
-                assert key instanceof BytesXMLMessage;
-                logger.warn(String.format("NACK for Message %s",key));
-                // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
-                //  - send the message again
-                //  - send it somewhere else (error handling queue?)
-                //  - log and continue
-                //  - pause and retry (backuoff)
-                //  - attempt to rollback state, send a different message ot reset?
-            } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
-                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
-                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
-                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
-                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
-                    System.out.println(cause);
-                }
-            }
-        }
-    }
-    //////////////////////////////////////////////////////
     
-    private static final String SAMPLE_NAME = GuaranteedRequestor.class.getSimpleName();
+    private static final String SAMPLE_NAME = GuaranteedRequestorAsync.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static final int REQUEST_TIMEOUT_MS = 5000;  // time to wait for a reply before timing out
 
-    private static final Logger logger = LogManager.getLogger(GuaranteedRequestor.class);  // log4j2, but could also use SLF4J, JCL, etc.
+    private static final Logger logger = LogManager.getLogger(GuaranteedRequestorAsync.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
 
-    public static void main(String... args) throws JCSMPException, IOException {
+    public static void main2b(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [client-password]%n%n",
-                    SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
         System.out.println(SAMPLE_NAME+" initializing...");
@@ -145,16 +101,13 @@ public class GuaranteedRequestor {
 
 //        final XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);  // less common use of synchronous consumer mode
 //        consumer.start();  // needed to accept the responses
-        
+
         Queue replyQueue = session.createTemporaryQueue();
         
         ConsumerFlowProperties flowProps = new ConsumerFlowProperties();
         flowProps.setEndpoint(replyQueue);
         FlowReceiver flow = session.createFlow(null, flowProps);
         flow.start();
-
-
-        
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         TextMessage requestMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
@@ -191,4 +144,65 @@ public class GuaranteedRequestor {
             session.closeSession();  // will also close producer and consumer objects
         }
     }
+
+
+
+    /** Static inner class to keep code clean, used for handling ACKs/NACKs from broker. **/
+    private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
+
+        @Override
+        public void responseReceivedEx(Object key) {
+            assert key != null;  // this shouldn't happen, this should only get called for an ACK
+            assert key instanceof BytesXMLMessage;
+            logger.debug(String.format("ACK for Message %s",key));  // good enough, the broker has it now
+        }
+
+        @Override
+        public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+            if (key != null) {  // NACK
+                assert key instanceof BytesXMLMessage;
+                logger.warn(String.format("NACK for Message %s",key));
+                // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
+                //  - send the message again
+                //  - send it somewhere else (error handling queue?)
+                //  - log and continue
+                //  - pause and retry (backuoff)
+                //  - attempt to rollback state, send a different message ot reset?
+            } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
+                System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdown = true;
+                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
+                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
+                    System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())+": "+e.getResponsePhrase());
+                    System.out.println(cause);
+                }
+            }
+        }
+    }
+
+
+    ////////////////////////////////////////////////////////////////////////////
+
+    /** Very simple static inner class, used for receives messages from Queue Flows. **/
+    private static class QueueFlowListener implements XMLMessageListener {
+
+        private static final String QUEUE_NAME = "asdf";
+
+        @Override
+        public void onReceive(BytesXMLMessage msg) {
+
+            msg.ackMessage();  // ACKs are asynchronous
+        }
+
+        @Override
+        public void onException(JCSMPException e) {
+            logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception", e);
+            if (e instanceof JCSMPTransportException) {
+                isShutdown = true;  // let's quit
+            }
+        }
+    }
+
+
 }
