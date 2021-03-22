@@ -1,0 +1,79 @@
+AD Win == 100
+
+
+
+100 bytes
+
+Received msgs/s: 0
+Received msgs/s: 0
+Received msgs/s: 0
+Received msgs/s: 0
+Received msgs/s: 92,387
+Received msgs/s: 154,913
+Received msgs/s: 157,660
+Received msgs/s: 161,816
+Received msgs/s: 156,160
+Received msgs/s: 155,869
+Received msgs/s: 161,919
+Received msgs/s: 161,872
+Received msgs/s: 161,735
+Received msgs/s: 162,542
+Received msgs/s: 158,935
+
+
+
+
+
+1000 bytes:
+
+Received msgs/s: 0
+Received msgs/s: 0
+Received msgs/s: 0
+Received msgs/s: 57,780
+Received msgs/s: 71,776
+Received msgs/s: 72,868
+Received msgs/s: 71,780
+Received msgs/s: 71,306
+Received msgs/s: 71,457
+Received msgs/s: 71,091
+
+PUB ONLY:
+
+Queue Name                                   Ingress              Egress
+Message VPN                             bytes/sec  msg/sec   bytes/sec  msg/sec
+------------------------------------- ----------- -------- ----------- --------
+q_samples
+aaron
+     Current Rate (1 sec sample)         89565276    83550           0        0
+
+SUB ONLY:
+Received msgs/s: 99,574
+Received msgs/s: 99,749
+Received msgs/s: 99,640
+Received msgs/s: 99,825
+Received msgs/s: 99,346
+Received msgs/s: 99,349
+
+
+
+
+
+
+
+msgs/s: 0
+Received msgs/s: 0
+--LOG-- 21:11:02.575 [Context_1_ReactorThread] INFO  com.solac.jcsmp.impl.flow.FlowHandleImpl - Subscriber flow congested, disabling connection read.
+Received msgs/s: 0
+Received msgs/s: 0
+Received msgs/s: 0
+Received msgs/s: 0
+
+Received msgs/s: 0
+ok, gonna consume them all
+--LOG-- 21:11:16.490 [main] INFO  com.solac.jcsmp.impl.flow.FlowHandleImpl - Subscriber flow uncongested, re-enabling connection read.
+5100
+Main thread quitting.
+
+
+
+

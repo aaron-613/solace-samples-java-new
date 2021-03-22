@@ -35,12 +35,25 @@ The goal of this tutorial is to demonstrate the most basic messaging interaction
 {% include_relative assets/solaceMessaging.md %}
 {% include_relative assets/solaceApi.md %}
 
+## Initializing
+
+For C and C# .NET, there is a bit of work to do before the API can be used to connect to the Solace broker.
+
+
+
+
 
 ## Connecting to the Solace message router
 
 In order to send or receive messages, an application must connect a Solace session. The Solace session is the basis for all client communication with the Solace message router.
 
 In the Solace messaging API for Java (JCSMP), Solace sessions are created from the JCSMP factory using a set of properties.
+
+### Java
+https://github.com/aaron-613/solace-samples-jcsmp/blob/master/src/main/java/com/solace/samples/DirectHelloWorldPubSub.java#L57-L70
+
+### JMS
+https://github.com/SolaceSamples/solace-samples-jms/blob/master/src/main/java/com/solace/samples/TopicPublisher.java#L57-L64
 
 ```java
 final JCSMPProperties properties = new JCSMPProperties();

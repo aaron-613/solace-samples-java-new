@@ -86,7 +86,7 @@ public class DirectHelloWorldPubSub {
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable connection, either terminate or restart
                     isShutdown = true;
                 }
             }
