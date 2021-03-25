@@ -8,7 +8,7 @@
  * Copyright 2009-2020 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.features.others;
+package com.solace.samples.features.others.deprecated;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
