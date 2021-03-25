@@ -19,7 +19,8 @@
 
 package com.solace.samples;
 
-import com.solacesystems.jcsmp.BytesMessage;
+import java.io.IOException;
+
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -31,7 +32,6 @@ import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
-import java.io.IOException;
 
 /** This is a more detailed subscriber sample. */
 public class DirectSubscriber {
@@ -39,7 +39,6 @@ public class DirectSubscriber {
     private static final String SAMPLE_NAME = DirectSubscriber.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
-    private static boolean VERIFY_PAYLOAD_DATA = true;           // should we do some processing of incoming messages?
     private static volatile int msgRecvCounter = 0;              // num messages received
     private static volatile boolean hasDetectedDiscard = false;  // detected any discards yet?
     private static volatile boolean isShutdown = false;          // are we done yet?

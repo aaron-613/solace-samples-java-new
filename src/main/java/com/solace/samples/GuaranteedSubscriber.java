@@ -36,7 +36,6 @@ import com.solacesystems.jcsmp.OperationNotSupportedException;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
-import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageListener;
 
 import org.apache.logging.log4j.LogManager;
