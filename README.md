@@ -11,8 +11,8 @@ Don't worry about all the warnings when you compile, those are getting changed.
 ## TO RUN
 ```
 cd build/staged
-bin/DirectSubscriber
-bin/DirectPublisher
+bin/DirectSubscriber <host:port> <message-vpn> <client-username> [password]
+bin/DirectPublisher <host:port> <message-vpn> <client-username> [password]
 ```
 
 ## Fundamentals
