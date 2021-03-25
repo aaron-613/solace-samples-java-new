@@ -24,7 +24,6 @@ import com.solacesystems.jcsmp.FlowReceiver;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.ProducerFlowProperties;
 import com.solacesystems.jcsmp.Queue;
@@ -33,7 +32,7 @@ import com.solacesystems.jcsmp.XMLMessageProducer;
 import com.solacesystems.jcsmp.transaction.RollbackException;
 import com.solacesystems.jcsmp.transaction.TransactedSession;
 
-public class Transactions extends SampleApp implements JCSMPStreamingPublishEventHandler {
+public class Transactions extends SampleApp implements JCSMPStreamingPublishCorrelatingEventHandler {
 
     public class Requestor implements JCSMPStreamingPublishCorrelatingEventHandler {
         public TransactedSession txSession;
