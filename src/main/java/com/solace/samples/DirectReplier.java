@@ -93,9 +93,8 @@ public class DirectReplier {
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage requestMsg) {
-                System.out.println(requestMsg.dump());
                 if (requestMsg.getDestination().getName().contains("direct/request") && requestMsg.getReplyTo() != null) {
-                    System.out.printf("Received request on '%s', generating response.%n", requestMsg.getDestination());
+                    System.out.printf(">> Received request on '%s', generating response.%n", requestMsg.getDestination());
                     System.out.println(requestMsg.dump());
                     TextMessage replyMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);  // reply with a Text
                     if (requestMsg.getApplicationMessageId() != null) {

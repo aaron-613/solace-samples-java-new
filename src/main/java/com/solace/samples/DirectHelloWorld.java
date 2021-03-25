@@ -111,7 +111,7 @@ public class DirectHelloWorld {
         System.out.printf(" - Run this sample twice to see true publish-subscribe. -%n%n");
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-        while (System.in.available() == 0 && !isShutdown) {  // time to loop, just use main thread
+        while (System.in.available() == 0 && !isShutdown) {  // loop now, just use main thread
             try {
                 Thread.sleep(5000);  // take a pause
                 // specify a text payload

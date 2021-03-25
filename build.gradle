@@ -101,7 +101,7 @@ def scripts = [
     'DirectProcessor':'com.solace.samples.DirectProcessor',
     'DirectPublisher':'com.solace.samples.DirectPublisher',
     'DirectReplier':'com.solace.samples.DirectReplier',
-    'DirectRequestor':'com.solace.samples.DirectRequestor',
+    'DirectRequestorBlocking':'com.solace.samples.DirectRequestorBlocking',
     'DirectSubscriber':'com.solace.samples.DirectSubscriber',
     'GuaranteedProcessor':'com.solace.samples.GuaranteedProcessor',
     'GuaranteedPublisher':'com.solace.samples.GuaranteedPublisher',

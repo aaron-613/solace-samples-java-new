@@ -66,7 +66,7 @@ public class DirectPublisher {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }
-        properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS, true);  // why not?
+        properties.setProperty(JCSMPProperties.GENERATE_SEQUENCE_NUMBERS, true);  // not required, but interesting
         JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
         channelProps.setReconnectRetries(20);      // recommended settings
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
@@ -115,14 +115,14 @@ public class DirectPublisher {
                     Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
                     message.setData(payload);
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
-                    // dynamic topics!! use StringBuilder because "+" concat operator is SLOW
+                    // dynamic topics!!
                     String topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/pub/").append(chosenCharacter).toString();
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
                     try {
-                        //Thread.sleep(0);
-                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        Thread.sleep(0);
+                        //Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;

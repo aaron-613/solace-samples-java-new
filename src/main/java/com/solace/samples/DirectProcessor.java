@@ -107,16 +107,17 @@ public class DirectProcessor {
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage inboundMsg) {
-                if (inboundMsg.getDestination().getName().startsWith(TOPIC_PREFIX + "/direct/pub")) {
+                String inboundTopic = inboundMsg.getDestination().getName();
+                if (inboundTopic.startsWith(TOPIC_PREFIX + "/direct/pub")) {
                     // how to process the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
-                    final String upperCaseMessage = inboundMsg.dump().toUpperCase();  // as a silly example of "processing"
+                    final String upperCaseMessage = inboundTopic.toUpperCase();  // as a silly example of "processing"
                     outboundMsg.setText(upperCaseMessage);
                     if (inboundMsg.getApplicationMessageId() != null) {
                         outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
                     }
-                    String [] inboundTopicLevels = inboundMsg.getDestination().getName().split("/");
-                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/proc/").append(inboundTopicLevels[4]).toString();
+                    String [] inboundTopicLevels = inboundTopic.split("/");
+                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/upper/").append(inboundTopicLevels[4]).toString();
                     try {
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                     } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)

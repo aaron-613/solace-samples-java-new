@@ -44,7 +44,7 @@ public class DirectRequestorBlocking {
 
     private static final String SAMPLE_NAME = DirectRequestorBlocking.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
-    private static final int REQUEST_TIMEOUT_MS = 1000;  // time to wait for a reply before timing out
+    private static final int REQUEST_TIMEOUT_MS = 3000;  // time to wait for a reply before timing out
 
     private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;
@@ -107,9 +107,9 @@ public class DirectRequestorBlocking {
                 Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/request");
                 System.out.printf(">> About to send request message #%d to topic '%s'...%n", msgSentCounter, topic.getName());
                 Requestor requestor = session.createRequestor();  // create the useful Requestor object, Direct only
-                BytesXMLMessage replyMsg = requestor.request(requestMsg, REQUEST_TIMEOUT_MS, topic);  // send and receive in one call
                 msgSentCounter++;  // add one
-                System.out.printf("Response Message Dump:%n%s%n", replyMsg.dump());
+                BytesXMLMessage replyMsg = requestor.request(requestMsg, REQUEST_TIMEOUT_MS, topic);  // send and receive in one blocking call
+                System.out.printf("vv Response Message Dump:%n%s%n", replyMsg.dump());
                 requestMsg.reset();  // reuse this message, to avoid having to recreate it: better performance
                 Thread.sleep(1000);  // approx. one request per second
             } catch (JCSMPRequestTimeoutException e) {
