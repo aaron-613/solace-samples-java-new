@@ -27,7 +27,7 @@ import com.solacesystems.jcsmp.CacheRequestResult;
 import com.solacesystems.jcsmp.CacheSession;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageProducer;
@@ -57,15 +57,15 @@ public class AsyncCacheRequest extends SampleApp {
 		finish(1);
     }
     
-    public class PubCallback implements JCSMPStreamingPublishEventHandler {
-        public void handleError(String messageID, JCSMPException cause,
+    public class PubCallback implements JCSMPStreamingPublishCorrelatingEventHandler {
+        public void handleErrorEx(Object key, JCSMPException cause,
             long timestamp) {
-            System.err.println("Error occurred for message: " + messageID);
+            System.err.println("Error occurred for message: " + key);
             cause.printStackTrace();
         }
 
         // Not Called - only errors are reported.
-        public void responseReceived(String messageID) {
+        public void responseReceivedEx(Object key) {
         }
     }
 

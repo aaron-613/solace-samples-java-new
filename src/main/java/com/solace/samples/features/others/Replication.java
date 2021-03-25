@@ -201,18 +201,11 @@ public class Replication extends SampleApp implements JCSMPStreamingPublishCorre
         System.exit(0);
     }
 
-    public void handleError(String messageID, JCSMPException cause,
-            long timestamp) {
-    }
-
     public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
         if (key != null) {
             System.out.println("Error sending message with correlation key \"" + key + "\"");
         }
         cause.printStackTrace();
-    }
-
-    public void responseReceived(String messageID) {
     }
 
     public void responseReceivedEx(Object key) {

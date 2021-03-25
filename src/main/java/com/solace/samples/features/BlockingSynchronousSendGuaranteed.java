@@ -131,16 +131,6 @@ public class BlockingSynchronousSendGuaranteed implements SessionEventHandler, J
 		}
 	}
 
-	public void handleError(String messageID, JCSMPException cause, long timestamp) {
-		// This method must be implemented for a JCSMPStreamingPublishCorrelatingEventHandler
-		// but it is never called. It has been replaced by handleErrorEx().
-	}
-
-	public void responseReceived(String messageID) {
-		// This method must be implemented for a JCSMPStreamingPublishCorrelatingEventHandler
-		// but it is never called. It has been replaced by responseReceivedEx().
-	}
-    
     /**
      * @param args
      */

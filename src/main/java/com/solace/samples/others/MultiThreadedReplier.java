@@ -27,20 +27,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class MultiThreadedReplier {
     
@@ -118,15 +118,15 @@ public class MultiThreadedReplier {
         final Topic topic = JCSMPFactory.onlyInstance().createTopic("tutorial/requests");
 
         /** Anonymous inner-class for handling publishing events */
-        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishEventHandler() {
+        final XMLMessageProducer producer = session.getMessageProducer(new JCSMPStreamingPublishCorrelatingEventHandler() {
             @Override
-            public void responseReceived(String messageID) {
-                System.out.println("Producer received response for msg: " + messageID);
+            public void responseReceivedEx(Object key) {
+                System.out.println("Producer received response for msg: " + key);
             }
 
             @Override
-            public void handleError(String messageID, JCSMPException e, long timestamp) {
-                System.out.printf("Producer received error for msg: %s@%s - %s%n", messageID, timestamp, e);
+            public void handleErrorEx(Object key, JCSMPException e, long timestamp) {
+                System.out.printf("Producer received error for msg: %s@%s - %s%n", key, timestamp, e);
             }
         });
 

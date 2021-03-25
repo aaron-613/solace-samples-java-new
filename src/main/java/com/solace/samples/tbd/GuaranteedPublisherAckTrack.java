@@ -105,16 +105,6 @@ public class GuaranteedPublisherAckTrack {
     private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
         
         @Override
-        public void responseReceived(String messageID) {
-            // deprecated, superseded by responseReceivedEx()
-        }
-        
-        @Override
-        public void handleError(String messageID, JCSMPException e, long timestamp) {
-            // deprecated, superseded by handleErrorEx()
-        }
-        
-        @Override
         public void responseReceivedEx(Object key) {
             logger.info(String.format("ACK %d START: %s",((MessageAckInfo)key).id,key));
             assert key != null;  // this shouldn't happen, this should only get called for an ACK

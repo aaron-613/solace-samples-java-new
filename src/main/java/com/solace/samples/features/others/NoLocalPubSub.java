@@ -33,7 +33,7 @@ import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.Topic;
@@ -41,17 +41,17 @@ import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
-public class NoLocalPubSub extends SampleApp implements JCSMPStreamingPublishEventHandler {
+public class NoLocalPubSub extends SampleApp implements JCSMPStreamingPublishCorrelatingEventHandler {
 	SessionConfiguration conf = null;
 	JCSMPSession session2 = null;
 
 	// JCSMPStreamingPublishEventHandler
-	public void handleError(String messageID, JCSMPException cause, long timestamp) {
+	public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
 		System.out.println("Publish Error callback handler ('400: NoLocal Discard' is normal): " + cause);
 	}
 
 	// JCSMPStreamingPublishEventHandler
-	public void responseReceived(String messageID) {
+	public void responseReceivedEx(Object key) {
 	}
 
 	@Override

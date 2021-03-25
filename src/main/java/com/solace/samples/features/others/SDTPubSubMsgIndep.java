@@ -28,7 +28,7 @@ import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.SDTStream;
@@ -39,7 +39,7 @@ import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
 public class SDTPubSubMsgIndep extends SampleApp implements
-        JCSMPStreamingPublishEventHandler, XMLMessageListener {
+        JCSMPStreamingPublishCorrelatingEventHandler, XMLMessageListener {
 
     Topic topic = null;
     XMLMessageProducer prod = null;
@@ -73,13 +73,13 @@ public class SDTPubSubMsgIndep extends SampleApp implements
     public SDTPubSubMsgIndep() {
     }
 
-    public void handleError(String messageID, JCSMPException cause,
+    public void handleErrorEx(Object key, JCSMPException cause,
             long timestamp) {
-        System.err.println("Error occurred for message: " + messageID);
+        System.err.println("Error occurred for message: " + key);
         cause.printStackTrace();
     }
 
-    public void responseReceived(String messageID) {
+    public void responseReceivedEx(Object key) {
     }
 
     public void onException(JCSMPException exception) {

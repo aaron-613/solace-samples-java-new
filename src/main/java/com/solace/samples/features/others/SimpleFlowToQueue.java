@@ -28,13 +28,13 @@ import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
 import com.solacesystems.jcsmp.JCSMPProperties;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 
-public class SimpleFlowToQueue extends SampleApp implements XMLMessageListener, JCSMPStreamingPublishEventHandler {
+public class SimpleFlowToQueue extends SampleApp implements XMLMessageListener, JCSMPStreamingPublishCorrelatingEventHandler {
     SessionConfiguration conf = null;
 
     // XMLMessageListener
@@ -48,14 +48,14 @@ public class SimpleFlowToQueue extends SampleApp implements XMLMessageListener, 
         message.ackMessage();
     }
 
-    // JCSMPStreamingPublishEventHandler
-    public void handleError(String messageID, JCSMPException cause,
+    // JCSMPStreamingPublishCorrelatingEventHandler
+    public void handleErrorEx(Object key, JCSMPException cause,
             long timestamp) {
         cause.printStackTrace();
     }
 
-    // JCSMPStreamingPublishEventHandler
-    public void responseReceived(String messageID) {        
+    // JCSMPStreamingPublishCorrelatingEventHandler
+    public void responseReceivedEx(Object key) {        
     }
 
     void createSession(String[] args) throws InvalidPropertiesException {

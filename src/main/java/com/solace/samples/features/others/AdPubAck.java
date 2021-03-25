@@ -124,14 +124,6 @@ public class AdPubAck extends SampleApp {
 				System.out.printf("Message response (accepted) received for %s \n", i);
 			}
 		}
-
-		public void handleError(String messageID, JCSMPException cause, long timestamp) {
-			// Never called
-		}
-
-		public void responseReceived(String messageID) {
-			// Never called
-		}
 	}
 
 	public void run(String[] args) {

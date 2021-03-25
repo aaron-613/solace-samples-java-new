@@ -17,7 +17,7 @@ import com.solacesystems.jcsmp.CapabilityType;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPRuntime;
 import com.solacesystems.jcsmp.JCSMPSession;
-import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageListener;
@@ -139,16 +139,16 @@ public abstract class SampleApp {
 		}
 	}
 
-	public class PrintingPubCallback implements JCSMPStreamingPublishEventHandler {
-		public void handleError(String messageID, JCSMPException cause, long timestamp) {
-			System.err.println("Error occurred for message: " + messageID);
+	public class PrintingPubCallback implements JCSMPStreamingPublishCorrelatingEventHandler {
+		public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+			System.err.println("Error occurred for message: " + key);
 			cause.printStackTrace();
 		}
 
 		// This method is only invoked for persistent and non-persistent
 		// messages.
-		public void responseReceived(String messageID) {
-			System.out.println("Response received for message: " + messageID);
+		public void responseReceivedEx(Object key) {
+			System.out.println("Response received for message: " + key);
 		}
 	}
 

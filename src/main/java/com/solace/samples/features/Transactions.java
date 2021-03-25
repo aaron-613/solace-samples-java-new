@@ -12,6 +12,10 @@
 
 package com.solace.samples.features;
 
+import com.solace.samples.features.common.ArgParser;
+import com.solace.samples.features.common.SampleApp;
+import com.solace.samples.features.common.SampleUtils;
+import com.solace.samples.features.common.SessionConfiguration;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.DeliveryMode;
@@ -19,22 +23,19 @@ import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.FlowReceiver;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.ProducerFlowProperties;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
-import com.solace.samples.features.common.ArgParser;
-import com.solace.samples.features.common.SampleApp;
-import com.solace.samples.features.common.SampleUtils;
-import com.solace.samples.features.common.SessionConfiguration;
 import com.solacesystems.jcsmp.transaction.RollbackException;
 import com.solacesystems.jcsmp.transaction.TransactedSession;
 
 public class Transactions extends SampleApp implements JCSMPStreamingPublishEventHandler {
 
-    public class Requestor implements JCSMPStreamingPublishEventHandler {
+    public class Requestor implements JCSMPStreamingPublishCorrelatingEventHandler {
         public TransactedSession txSession;
         public XMLMessageProducer producer;
         public FlowReceiver receiver;
@@ -57,18 +58,18 @@ public class Transactions extends SampleApp implements JCSMPStreamingPublishEven
             receiver = txSession.createFlow(null, consFlowProps, endpointProps);
         }
         
-        public void handleError(String messageID, JCSMPException cause,
+        public void handleErrorEx(Object key, JCSMPException cause,
                 long timestamp) {
             System.err.println("Requestor handleError " + cause);
             cause.printStackTrace();
         }
 
-        public void responseReceived(String messageID) {
+        public void responseReceivedEx(Object key) {
             // Do Nothing
         } 
     }
 
-    public class Replier implements JCSMPStreamingPublishEventHandler, XMLMessageListener {
+    public class Replier implements JCSMPStreamingPublishCorrelatingEventHandler, XMLMessageListener {
         public TransactedSession txSession;
         public XMLMessageProducer producer;
         public FlowReceiver receiver;
@@ -116,13 +117,13 @@ public class Transactions extends SampleApp implements JCSMPStreamingPublishEven
             exception.printStackTrace();            
         }
         
-        public void handleError(String messageID, JCSMPException cause,
+        public void handleErrorEx(Object key, JCSMPException cause,
                 long timestamp) {
             System.err.println("Replier handleError " + cause);
             cause.printStackTrace();
         }
         
-        public void responseReceived(String messageID) {
+        public void responseReceivedEx(Object key) {
             // Do Nothing
         }
     }
@@ -130,12 +131,12 @@ public class Transactions extends SampleApp implements JCSMPStreamingPublishEven
     private SessionConfiguration conf;
 
 
-    public void handleError(String messageID, JCSMPException cause,
+    public void handleErrorEx(Object key, JCSMPException cause,
             long timestamp) {
         // Do Nothing
     }
 
-    public void responseReceived(String messageID) {
+    public void responseReceivedEx(Object key) {
         // Do Nothing
     }
 
