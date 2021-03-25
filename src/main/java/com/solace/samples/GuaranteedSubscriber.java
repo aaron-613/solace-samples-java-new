@@ -19,6 +19,8 @@
 
 package com.solace.samples;
 
+import java.io.IOException;
+
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.FlowEventArgs;
@@ -34,15 +36,16 @@ import com.solacesystems.jcsmp.OperationNotSupportedException;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
+import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLMessageListener;
-import java.io.IOException;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class GuaranteedSubscriber {
 
     private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
-    private static final String QUEUE_NAME = "q_samples";
+    private static final String QUEUE_NAME = "q_pers_sub";
     
     private static volatile int msgRecvCounter = 0;                 // num messages received
     private static volatile boolean hasDetectedRedelivery = false;  // detected any messages being redelivered?
@@ -85,6 +88,7 @@ public class GuaranteedSubscriber {
         final FlowReceiver flowQueueReceiver;
         System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
         try {
+            // see bottom of file for QueueFlowListener class, which receives the messages from the queue
             flowQueueReceiver = session.createFlow(new QueueFlowListener(), flow_prop, null, new FlowEventHandler() {
                 @Override
                 public void handleEvent(Object source, FlowEventArgs event) {
@@ -96,8 +100,10 @@ public class GuaranteedSubscriber {
             throw e;
         } catch (JCSMPErrorResponseException e) {  // something else went wrong: queue not exist, queue shutdown, etc.
             logger.error(e);
-            System.out.printf("%nCould not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
-            System.out.println("Ensure queue exists using PubSub+ Manager WebGUI, or see the scripts inside the 'semp-rest-api' directory.");
+            System.out.printf("%n*** Could not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
+            System.out.println("Create queue using PubSub+ Manager WebGUI, and add subscription "+
+                    GuaranteedPublisher.TOPIC_PREFIX+"/pers/>");
+            System.out.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
             System.out.println("NOTE: see GuaranteedQueueProvision sample for how to construct queue with consumer app.");
             System.out.println("Exiting.");
@@ -105,6 +111,7 @@ public class GuaranteedSubscriber {
         }
         // tell the broker to start sending messages on this queue receiver
         flowQueueReceiver.start();
+        // async queue receive working now, so time to wait until done...
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
             while (System.in.available() == 0 && !isShutdown) {

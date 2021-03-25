@@ -49,7 +49,7 @@ import org.apache.logging.log4j.Logger;
 public class GuaranteedPublisher {
     
     private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
     private static final int PUBLISH_WINDOW_SIZE = 50;
     private static final int APPROX_MSG_RATE_PER_SEC = 10;
@@ -117,8 +117,8 @@ public class GuaranteedPublisher {
                     map.putString("sample","JCSMP GuaranteedPublisher");
                     message.setProperties(map);
                     message.setCorrelationKey(message);  // used for ACK/NACK correlation locally within the API
-                    //message.setAckImmediately(true);
                     String topicString = new StringBuilder(TOPIC_PREFIX).append("/pers/pub/").append(chosenCharacter).toString();
+                    // NOTE: publishing to topic, so make sure GuaranteedSubscriber queue is subscribed to same topic
                     Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
                     producer.send(message, topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
                     msgSentCounter++;
@@ -129,7 +129,6 @@ public class GuaranteedPublisher {
                     } catch (InterruptedException e) {
                         isShutdown = true;
                     }
-
                 }
             } catch (JCSMPException e) {
                 e.printStackTrace();
