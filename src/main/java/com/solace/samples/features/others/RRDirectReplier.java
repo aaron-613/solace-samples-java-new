@@ -176,7 +176,7 @@ public class RRDirectReplier extends SampleApp {
                 case TIMES:
                     return (double)(leftOperand * rightOperand);
                 case DIVIDE:
-                    return (double)((double)leftOperand / (double)rightOperand);
+                    return (double)leftOperand / (double)rightOperand;
                 default:
                     throw new Exception("Unkown operation");
             }
