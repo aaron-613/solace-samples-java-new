@@ -89,17 +89,6 @@ public class DirectSubscriber {
                     //  c) increase size of consumer's D-1 egress buffers (check client-profile) (helps more with bursts)
                     hasDetectedDiscard = true;  // set my own flag
                 }
-                // this next block is just to have a non-trivial onReceive() callback... let's do a bit of work
-                if (VERIFY_PAYLOAD_DATA) {
-                    // check for gaps in message sequence num..?
-                    // or (as set in publisher code) verify that the published topic ends with same char as in the payload
-                    if (message instanceof BytesMessage && message.getAttachmentContentLength() > 0) {  // non-empty BytesMessage
-                        // do some stuff
-                    } else {  // unexpected?
-                        System.out.printf("vvv Received non-BytesMessage vvv%n%s%n",message.dump());  // just print
-                        VERIFY_PAYLOAD_DATA = false;  // don't do any further testing
-                    }
-                }
                 if (message.getDestination().getName().endsWith("control/quit")) {  // special sample message
                     System.out.println("QUIT message received, shutting down.");  // exampe of command-and-control w/msgs
                     isShutdown = true;
