@@ -13,6 +13,7 @@
 
 package com.solace.samples.features.others.deprecated;
 
+import com.solace.samples.samplers.common.SampleApp;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
@@ -29,8 +30,6 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
-
-import com.solace.samples.features.common.SampleApp;
 
 public class SempHttpSetRequest extends SampleApp {
     

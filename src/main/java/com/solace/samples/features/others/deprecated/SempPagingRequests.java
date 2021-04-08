@@ -29,11 +29,10 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
-
-import com.solace.samples.features.common.ArgParser;
-import com.solace.samples.features.common.SampleApp;
-import com.solace.samples.features.common.SampleUtils;
-import com.solace.samples.features.common.SessionConfiguration;
+import com.solace.samples.samplers.common.ArgParser;
+import com.solace.samples.samplers.common.SampleApp;
+import com.solace.samples.samplers.common.SampleUtils;
+import com.solace.samples.samplers.common.SessionConfiguration;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.CapabilityType;
 import com.solacesystems.jcsmp.Consumer;
