@@ -41,18 +41,19 @@ import com.solacesystems.jcsmp.XMLMessageListener;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-public class GuaranteedSubscriber {
+public class GuaranteedProcessor {
 
-    private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
+    private static final String SAMPLE_NAME = GuaranteedProcessor.class.getSimpleName();
     private static final String QUEUE_NAME = "q_pers_sub";
     
     private static volatile int msgRecvCounter = 0;                 // num messages received
     private static volatile boolean hasDetectedRedelivery = false;  // detected any messages being redelivered?
     private static volatile boolean isShutdown = false;             // are we done?
 
-    private static final Logger logger = LogManager.getLogger(GuaranteedSubscriber.class);  // log4j2, but could also use SLF4J, JCL, etc.
+    private static final Logger logger = LogManager.getLogger(GuaranteedProcessor.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
-    /** This is the main app.  Use this type of app for receiving Guarnateed messages (e.g. via a queue endpoint). */
+    /** This is the main app.  Use this type of app for receiving Guaranteed messages (e.g. via a queue endpoint),
+     *  doing some processing (translation, decoration, etc.) and then republishing to a new destination. */
     public static void main(String... args) throws JCSMPException, InterruptedException, IOException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
