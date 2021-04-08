@@ -14,7 +14,7 @@
  * Copyright 2009-2020 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers.others;
+package com.solace.samples.samplers;
 
 import com.solace.samples.samplers.common.ArgParser;
 import com.solace.samples.samplers.common.SampleApp;
