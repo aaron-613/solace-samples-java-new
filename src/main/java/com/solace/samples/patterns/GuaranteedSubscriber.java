@@ -52,7 +52,7 @@ public class GuaranteedSubscriber {
 
     private static final Logger logger = LogManager.getLogger(GuaranteedSubscriber.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
-    /** This is the main app.  Use this type of app for receiving Guarnateed messages (e.g. via a queue endpoint). */
+    /** This is the main app.  Use this type of app for receiving Guaranteed messages (e.g. via a queue endpoint). */
     public static void main(String... args) throws JCSMPException, InterruptedException, IOException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
