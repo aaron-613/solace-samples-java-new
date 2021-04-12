@@ -37,9 +37,9 @@ import java.io.InputStreamReader;
 /**
  * This simple introductory sample shows an application that both publishes and subscribes.
  */
-public class DirectHelloWorld {
+public class HelloWorld {
     
-    private static final String SAMPLE_NAME = DirectHelloWorld.class.getSimpleName();
+    private static final String SAMPLE_NAME = HelloWorld.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static volatile boolean isShutdown = false;           // are we done yet?
 

@@ -86,25 +86,25 @@ tasks.withType(JavaCompile).all {
 }
 
 def scripts = [
-    'DirectHelloWorld':'com.solace.samples.DirectHelloWorld',
-    'DirectProcessor':'com.solace.samples.DirectProcessor',
-    'DirectPublisher':'com.solace.samples.DirectPublisher',
-    'DirectReplier':'com.solace.samples.DirectReplier',
-    'DirectRequestorBlocking':'com.solace.samples.DirectRequestorBlocking',
-    'DirectSubscriber':'com.solace.samples.DirectSubscriber',
-    'GuaranteedProcessor':'com.solace.samples.GuaranteedProcessor',
-    'GuaranteedPublisher':'com.solace.samples.GuaranteedPublisher',
-    'GuaranteedPublisherAckTrack':'com.solace.samples.GuaranteedPublisherAckTrack',
-    'GuaranteedReplier':'com.solace.samples.GuaranteedReplier',
-    'GuaranteedRequestor':'com.solace.samples.GuaranteedRequestor',
-    'GuaranteedSubscriber':'com.solace.samples.GuaranteedSubscriber',
-    'TransactedProcessor':'com.solace.samples.TransactedProcessor',
-    'featureMessageSelectorsOnQueue':'com.solace.samples.features.MessageSelectorsOnQueue',
-    'featureMessageTTLAndDeadMessageQueue':'com.solace.samples.features.MessageTTLAndDeadMessageQueue',
-    'featureQueueProvisionAndBrowse':'com.solace.samples.features.QueueProvisionAndBrowse',
-    'featureQueueProvisionAndRequestActiveFlowIndication':'com.solace.samples.features.QueueProvisionAndRequestActiveFlowIndication',
-    'featureTransactions':'com.solace.samples.features.Transactions',
-    'featureMessageReplay':'com.solace.samples.features.MessageReplay'
+    'HelloWorld':'com.solace.samples.HelloWorld',
+    'DirectProcessor':'com.solace.samples.patterns.DirectProcessor',
+    'DirectPublisher':'com.solace.samples.patterns.DirectPublisher',
+    'DirectReplier':'com.solace.samples.patterns.DirectReplier',
+    'DirectRequestorBlocking':'com.solace.samples.patterns.DirectRequestorBlocking',
+    'DirectSubscriber':'com.solace.samples.patterns.DirectSubscriber',
+    'GuaranteedProcessor':'com.solace.samples.patterns.GuaranteedProcessor',
+    'GuaranteedPublisher':'com.solace.samples.patterns.GuaranteedPublisher',
+    'GuaranteedPublisherAckTrack':'com.solace.samples.patterns.GuaranteedPublisherAckTrack',
+    'GuaranteedReplier':'com.solace.samples.patterns.GuaranteedReplier',
+    'GuaranteedRequestor':'com.solace.samples.patterns.GuaranteedRequestor',
+    'GuaranteedSubscriber':'com.solace.samples.patterns.GuaranteedSubscriber',
+    'TransactedProcessor':'com.solace.samples.patterns.TransactedProcessor',
+    'featureMessageSelectorsOnQueue':'com.solace.samples.samplers.MessageSelectorsOnQueue',
+    'featureMessageTTLAndDeadMessageQueue':'com.solace.samples.samplers.MessageTTLAndDeadMessageQueue',
+    'featureQueueProvisionAndBrowse':'com.solace.samples.samplers.QueueProvisionAndBrowse',
+    'featureQueueProvisionAndRequestActiveFlowIndication':'com.solace.samples.samplers.QueueProvisionAndRequestActiveFlowIndication',
+    'featureTransactions':'com.solace.samples.samplers.Transactions',
+    'featureMessageReplay':'com.solace.samples.samplers.MessageReplay'
 ]
 scripts.each() { scriptName, className ->
     def t = tasks.create(name: scriptName+'StartScript', type: CreateStartScripts) {
