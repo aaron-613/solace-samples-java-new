@@ -41,7 +41,6 @@ import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.TextMessage;
-import com.solacesystems.jcsmp.XMLMessageListener;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
@@ -138,9 +137,8 @@ public class GuaranteedProcessor {
         BytesXMLMessage inboundMsg;
         
         while (System.in.available() == 0 && !isShutdown) {
-            inboundMsg = flowQueueReceiver.receive();  // blocking receive a message
-            if (inboundMsg == null) {  // receive() got interrupted, so terminating
-                isShutdown = true;
+            inboundMsg = flowQueueReceiver.receive(1000);  // blocking receive a message
+            if (inboundMsg == null) {  // receive() either got interrupted, or timed out
                 continue;
             }
             msgRecvCounter++;
@@ -173,32 +171,11 @@ public class GuaranteedProcessor {
         isShutdown = true;
         flowQueueReceiver.stop();
         Thread.sleep(1000);
+        System.out.println("Total messages received: "+msgRecvCounter);
         session.closeSession();  // will also close consumer object
         System.out.println("Main thread quitting.");
     }
 
-    ////////////////////////////////////////////////////////////////////////////
-
-    /** Very simple static inner class, used for receives messages from Queue Flows. **/
-    private static class QueueFlowListener implements XMLMessageListener {
-
-        @Override
-        public void onReceive(BytesXMLMessage msg) {
-            System.out.println("shouldn't be callled");
-        }
-
-        @Override
-        public void onException(JCSMPException e) {
-            logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception.  Stopping!!", e);
-            if (e instanceof JCSMPTransportException) {
-                isShutdown = true;  // let's quit
-            } else {
-                // Generally unrecoverable exception, probably need to recreate and restart the flow
-                flowQueueReceiver.close();
-                // add logic in main thread to restart FlowReceiver, or can exit the program
-            }
-        }
-    }
     
     ////////////////////////////////////////////////////////////////////////////
     
@@ -229,8 +206,9 @@ public class GuaranteedProcessor {
         @Override
         public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
             if (key != null) {  // NACK
-                assert key instanceof BytesXMLMessage;
-                logger.warn(String.format("NACK for Message %s - %s", key, cause));
+                assert key instanceof ProcessorCorrelationKey;
+                ProcessorCorrelationKey ck = (ProcessorCorrelationKey)key;
+                logger.warn(String.format("NACK for Message %s - %s", ck.outboundMsg, cause));
                 // probably want to do something here.  some error handling possibilities:
                 //  - send the message again
                 //  - send it somewhere else (error handling queue?)
