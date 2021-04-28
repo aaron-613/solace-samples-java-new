@@ -52,7 +52,7 @@ public class GuaranteedPublisher {
     static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
 
     private static final int PUBLISH_WINDOW_SIZE = 50;
-    private static final int APPROX_MSG_RATE_PER_SEC = 10;
+    private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 512;
     
     private static final Logger logger = LogManager.getLogger(GuaranteedPublisher.class);  // log4j2, but could also use SLF4J, JCL, etc.
@@ -93,7 +93,7 @@ public class GuaranteedPublisher {
         XMLMessageProducer producer = session.getMessageProducer(new PublishCallbackHandler(), new JCSMPProducerEventHandler() {
             @Override
             public void handleEvent(ProducerEventArgs event) {
-                // as of v10.10, this event only occurs when republishing unACKed messages on an unknown flow
+                // as of v10.10, this event only occurs when republishing unACKed messages on an unknown flow (DR failover)
                 logger.info("*** Received a producer event: " + event);
             }
         });
@@ -101,6 +101,7 @@ public class GuaranteedPublisher {
         ExecutorService publishThread = Executors.newSingleThreadExecutor();
         publishThread.submit(() -> {
             byte[] payload = new byte[PAYLOAD_SIZE];
+            System.out.println("Publishing to topic '"+ TOPIC_PREFIX + "/pers/pub/...', please ensure queue has subscription."); 
             try {
                 while (!isShutdown) {
                     BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
@@ -165,13 +166,12 @@ public class GuaranteedPublisher {
         public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
             if (key != null) {  // NACK
                 assert key instanceof BytesXMLMessage;
-                logger.warn(String.format("NACK for Message %s", key), cause);
-                // probably want to do something here.  refer to sample xxxxxxx for error handling possibilities
+                logger.warn(String.format("NACK for Message %s - %s", key, cause));
+                // probably want to do something here.  some error handling possibilities:
                 //  - send the message again
                 //  - send it somewhere else (error handling queue?)
                 //  - log and continue
-                //  - pause and retry (backuoff)
-                //  - attempt to rollback state, send a different message ot reset?
+                //  - pause and retry (backoff) - maybe set a flag to slow down the publisher
             } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
                 logger.warn("### Producer handleErrorEx() callback: %s%n", cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
@@ -183,5 +183,4 @@ public class GuaranteedPublisher {
             }
         }
     }
-
 }

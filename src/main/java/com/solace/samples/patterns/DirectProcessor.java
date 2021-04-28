@@ -109,7 +109,7 @@ public class DirectProcessor {
             public void onReceive(BytesXMLMessage inboundMsg) {
                 String inboundTopic = inboundMsg.getDestination().getName();
                 if (inboundTopic.startsWith(TOPIC_PREFIX + "/direct/pub")) {
-                    // how to process the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
+                    // how to "process" the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
                     final String upperCaseMessage = inboundTopic.toUpperCase();  // as a silly example of "processing"
                     outboundMsg.setText(upperCaseMessage);

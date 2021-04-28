@@ -19,13 +19,12 @@
 
 package com.solace.samples.patterns;
 
-import java.io.IOException;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.FlowEventArgs;
 import com.solacesystems.jcsmp.FlowEventHandler;
 import com.solacesystems.jcsmp.FlowReceiver;
+import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPErrorResponseException;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
@@ -37,14 +36,14 @@ import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageListener;
-
+import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class GuaranteedSubscriber {
 
     private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
-    private static final String QUEUE_NAME = "q1";
+    private static final String QUEUE_NAME = "q_samples";
     
     private static volatile int msgRecvCounter = 0;                 // num messages received
     private static volatile boolean hasDetectedRedelivery = false;  // detected any messages being redelivered?
@@ -69,8 +68,13 @@ public class GuaranteedSubscriber {
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
         }   
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
         final JCSMPSession session;
-        session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
                 logger.info("### Received a Session event: " + event);
@@ -83,7 +87,7 @@ public class GuaranteedSubscriber {
         // Create a Flow be able to bind to and consume messages from the Queue.
         final ConsumerFlowProperties flow_prop = new ConsumerFlowProperties();
         flow_prop.setEndpoint(queue);
-        flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
+        flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);  // best practice
         flow_prop.setActiveFlowIndication(true);  // Flow events will advise when 
 
         System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
@@ -155,7 +159,7 @@ public class GuaranteedSubscriber {
 
         @Override
         public void onException(JCSMPException e) {
-            logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception", e);
+            logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception.  Stopping!!", e);
             if (e instanceof JCSMPTransportException) {
                 isShutdown = true;  // let's quit
             } else {

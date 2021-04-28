@@ -19,36 +19,44 @@
 
 package com.solace.samples.patterns;
 
-import java.io.IOException;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
+import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.FlowEventArgs;
 import com.solacesystems.jcsmp.FlowEventHandler;
 import com.solacesystems.jcsmp.FlowReceiver;
+import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPErrorResponseException;
+import com.solacesystems.jcsmp.JCSMPErrorResponseSubcodeEx;
 import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPFactory;
+import com.solacesystems.jcsmp.JCSMPProducerEventHandler;
 import com.solacesystems.jcsmp.JCSMPProperties;
 import com.solacesystems.jcsmp.JCSMPSession;
+import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
 import com.solacesystems.jcsmp.OperationNotSupportedException;
+import com.solacesystems.jcsmp.ProducerEventArgs;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
+import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLMessageListener;
-
+import com.solacesystems.jcsmp.XMLMessageProducer;
+import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 public class GuaranteedProcessor {
 
     private static final String SAMPLE_NAME = GuaranteedProcessor.class.getSimpleName();
-    private static final String QUEUE_NAME = "q_pers_sub";
+    static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final int PUBLISH_WINDOW_SIZE = 100;
+    private static final String QUEUE_NAME = "q_pers_proc";
     
     private static volatile int msgRecvCounter = 0;                 // num messages received
-    private static volatile boolean hasDetectedRedelivery = false;  // detected any messages being redelivered?
     private static volatile boolean isShutdown = false;             // are we done?
+    private static FlowReceiver flowQueueReceiver;
 
     private static final Logger logger = LogManager.getLogger(GuaranteedProcessor.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
@@ -67,33 +75,46 @@ public class GuaranteedProcessor {
         properties.setProperty(JCSMPProperties.USERNAME, args[2]);      // client-username
         if (args.length > 3) {
             properties.setProperty(JCSMPProperties.PASSWORD, args[3]);  // client-password
-        }   
+        }
+        properties.setProperty(JCSMPProperties.PUB_ACK_WINDOW_SIZE, PUBLISH_WINDOW_SIZE);
+        JCSMPChannelProperties channelProps = new JCSMPChannelProperties();
+        channelProps.setReconnectRetries(20);      // recommended settings
+        channelProps.setConnectRetriesPerHost(5);  // recommended settings
+        // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
+        properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
         final JCSMPSession session;
-        session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
+        session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                logger.info("### Received a Session event: %s%n", event);
+                logger.info("### Received a Session event: " + event);
             }
         });
         session.connect();
+        
+        XMLMessageProducer producer = session.getMessageProducer(new PublishCallbackHandler(), new JCSMPProducerEventHandler() {
+            @Override
+            public void handleEvent(ProducerEventArgs event) {
+                // as of v10.10, this event only occurs when republishing unACKed messages on an unknown flow (DR failover)
+                logger.info("*** Received a producer event: " + event);
+            }
+        });
 
         // configure the queue API object locally
         final Queue queue = JCSMPFactory.onlyInstance().createQueue(QUEUE_NAME);
         // Create a Flow be able to bind to and consume messages from the Queue.
         final ConsumerFlowProperties flow_prop = new ConsumerFlowProperties();
         flow_prop.setEndpoint(queue);
-        flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
+        flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);  // best practice
         flow_prop.setActiveFlowIndication(true);  // Flow events will advise when 
 
-        final FlowReceiver flowQueueReceiver;
         System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
         try {
-            // see bottom of file for QueueFlowListener class, which receives the messages from the queue
-            flowQueueReceiver = session.createFlow(new QueueFlowListener(), flow_prop, null, new FlowEventHandler() {
+            // passing null for Listener, so using blocking receive(), 
+            flowQueueReceiver = session.createFlow(null, flow_prop, null, new FlowEventHandler() {
                 @Override
                 public void handleEvent(Object source, FlowEventArgs event) {
                     // Flow events are usually: active, reconnecting (i.e. unbound), reconnected
-                    logger.info("### Received a Flow event: %s%n", event);
+                    logger.info("### Received a Flow event: " + event);
                 }
             });
         } catch (OperationNotSupportedException e) {  // not allowed to do this
@@ -111,20 +132,43 @@ public class GuaranteedProcessor {
         }
         // tell the broker to start sending messages on this queue receiver
         flowQueueReceiver.start();
-        // async queue receive working now, so time to wait until done...
+        // sync/blocking queue receive working now, so time to wait until done...
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
-        try {
-            while (System.in.available() == 0 && !isShutdown) {
-                Thread.sleep(1000);  // wait 1 second
-                System.out.printf("Received msgs/s: %,d%n", msgRecvCounter);  // simple way of calculating message rates
-                msgRecvCounter = 0;
-                if (hasDetectedRedelivery) {
-                    System.out.println("*** Redelivery detected ***");
-                    hasDetectedRedelivery = false;  // only show the error once per second
-                }
+        System.out.println("Remember to modify the queue topic subscriptions to match Publisher and Processor");
+        BytesXMLMessage inboundMsg;
+        
+        while (System.in.available() == 0 && !isShutdown) {
+            inboundMsg = flowQueueReceiver.receive();  // blocking receive a message
+            if (inboundMsg == null) {  // receive() got interrupted, so terminating
+                isShutdown = true;
+                continue;
             }
-        } catch (InterruptedException e) {
-            // Thread.sleep() interrupted... probably getting shut down
+            msgRecvCounter++;
+            String inboundTopic = inboundMsg.getDestination().getName();
+            if (inboundTopic.startsWith(TOPIC_PREFIX + "/pers/pub")) {
+                // how to "process" the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
+                TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
+                final String upperCaseTopic = inboundTopic.toUpperCase();  // as a silly example of "processing"
+                outboundMsg.setText(upperCaseTopic);
+                if (inboundMsg.getApplicationMessageId() != null) {
+                    outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
+                }
+                outboundMsg.setDeliveryMode(DeliveryMode.PERSISTENT);
+                outboundMsg.setCorrelationKey(new ProcessorCorrelationKey(inboundMsg, outboundMsg));  // need to wait for publish ACK
+                String [] inboundTopicLevels = inboundTopic.split("/",5);
+                String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/pers/upper/").append(inboundTopicLevels[4]).toString();
+                try {
+                    producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
+                } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
+                    System.out.printf("### Caught while trying to producer.send(): %s%n",e);
+                    if (e instanceof JCSMPTransportException) {  // unrecoverable
+                        isShutdown = true;
+                    }
+                }
+            } else {  // unexpected. either log or something
+                logger.info("Received an unexpected message with topic "+inboundTopic+".  Ignoring");
+                inboundMsg.ackMessage();
+            }
         }
         isShutdown = true;
         flowQueueReceiver.stop();
@@ -140,25 +184,69 @@ public class GuaranteedProcessor {
 
         @Override
         public void onReceive(BytesXMLMessage msg) {
-            msgRecvCounter++;
-            if (msg.getRedelivered()) {  // useful check
-                // this is the broker telling the consumer that this message has been sent and not ACKed before.
-                // this can happen if an exception is thrown, or the broker restarts, or the netowrk disconnects
-                // perhaps an error in processing? Should do extra checks to avoid duplicate processing
-                hasDetectedRedelivery = true;
-            }
-            // Messages are removed from the broker queue when the ACK is received.
-            // Therefore, DO NOT ACK until all processing/storing of this message is complete.
-            // NOTE that messages can be acknowledged from a different thread.
-            msg.ackMessage();  // ACKs are asynchronous
+            System.out.println("shouldn't be callled");
         }
 
         @Override
         public void onException(JCSMPException e) {
-            logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception", e);
+            logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception.  Stopping!!", e);
             if (e instanceof JCSMPTransportException) {
                 isShutdown = true;  // let's quit
+            } else {
+                // Generally unrecoverable exception, probably need to recreate and restart the flow
+                flowQueueReceiver.close();
+                // add logic in main thread to restart FlowReceiver, or can exit the program
             }
         }
     }
+    
+    ////////////////////////////////////////////////////////////////////////////
+    
+    /** Hold onto both messages, wait for outbound ACK to come back, and then ACK inbound message */
+    private static class ProcessorCorrelationKey {
+        
+        private final BytesXMLMessage inboundMsg;
+        private final BytesXMLMessage outboundMsg;
+        
+        private ProcessorCorrelationKey(BytesXMLMessage inboundMsg, BytesXMLMessage outboundMsg) {
+            this.inboundMsg = inboundMsg;
+            this.outboundMsg = outboundMsg;
+        }
+    }
+    
+    /** Very simple static inner class, used for handling ACKs/NACKs from broker. **/
+    private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
+
+        @Override
+        public void responseReceivedEx(Object key) {
+            assert key != null;  // this shouldn't happen, this should only get called for an ACK
+            assert key instanceof ProcessorCorrelationKey;
+            ProcessorCorrelationKey ck = (ProcessorCorrelationKey)key;
+            ck.inboundMsg.ackMessage();  // ONLY ACK inbound msg of my queue once outbound msg is Guaranteed
+            logger.debug(String.format("ACK for Message %s", ck));  // good enough, the broker has it now
+        }
+        
+        @Override
+        public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
+            if (key != null) {  // NACK
+                assert key instanceof BytesXMLMessage;
+                logger.warn(String.format("NACK for Message %s - %s", key, cause));
+                // probably want to do something here.  some error handling possibilities:
+                //  - send the message again
+                //  - send it somewhere else (error handling queue?)
+                //  - log and continue
+                //  - pause and retry (backoff) - maybe set a flag to slow down the publisher
+            } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
+                logger.warn("### Producer handleErrorEx() callback: %s%n", cause);
+                if (cause instanceof JCSMPTransportException) {  // unrecoverable
+                    isShutdown = true;
+                } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
+                    JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
+                    logger.warn("Specifics: " + JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx()) + ": " + e.getResponsePhrase());
+                }
+            }
+        }
+    }
+
+    
 }
