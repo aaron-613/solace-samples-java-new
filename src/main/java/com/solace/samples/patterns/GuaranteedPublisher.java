@@ -172,7 +172,7 @@ public class GuaranteedPublisher {
                 //  - send it somewhere else (error handling queue?)
                 //  - log and continue
                 //  - pause and retry (backoff) - maybe set a flag to slow down the publisher
-            } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
+            } else {  // not a NACK, but some other error (ACL violation, connection loss, message too big, ...)
                 logger.warn("### Producer handleErrorEx() callback: %s%n", cause);
                 if (cause instanceof JCSMPTransportException) {  // unrecoverable
                     isShutdown = true;

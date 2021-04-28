@@ -96,8 +96,9 @@ public class GuaranteedSubscriber {
             flowQueueReceiver = session.createFlow(new QueueFlowListener(), flow_prop, null, new FlowEventHandler() {
                 @Override
                 public void handleEvent(Object source, FlowEventArgs event) {
-                    // Flow events are usually: active, reconnecting (i.e. unbound), reconnected
+                    // Flow events are usually: active, reconnecting (i.e. unbound), reconnected, active
                     logger.info("### Received a Flow event: " + event);
+                    // try disabling and re-enabling the queue to see in action
                 }
             });
         } catch (OperationNotSupportedException e) {  // not allowed to do this

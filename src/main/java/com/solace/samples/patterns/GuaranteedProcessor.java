@@ -133,7 +133,7 @@ public class GuaranteedProcessor {
         flowQueueReceiver.start();
         // sync/blocking queue receive working now, so time to wait until done...
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
-        System.out.println("Remember to modify the queue topic subscriptions to match Publisher and Processor");
+        System.out.println(" * Remember to modify the queue topic subscriptions to match Publisher and Processor");
         BytesXMLMessage inboundMsg;
         
         while (System.in.available() == 0 && !isShutdown) {
