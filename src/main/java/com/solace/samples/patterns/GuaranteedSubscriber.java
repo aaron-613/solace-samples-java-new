@@ -44,11 +44,13 @@ import org.apache.logging.log4j.Logger;
 public class GuaranteedSubscriber {
 
     private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
-    private static final String QUEUE_NAME = "q_pers_sub";
+    private static final String QUEUE_NAME = "q1";
     
     private static volatile int msgRecvCounter = 0;                 // num messages received
     private static volatile boolean hasDetectedRedelivery = false;  // detected any messages being redelivered?
     private static volatile boolean isShutdown = false;             // are we done?
+    private static FlowReceiver flowQueueReceiver;
+
 
     private static final Logger logger = LogManager.getLogger(GuaranteedSubscriber.class);  // log4j2, but could also use SLF4J, JCL, etc.
 
@@ -71,7 +73,7 @@ public class GuaranteedSubscriber {
         session = JCSMPFactory.onlyInstance().createSession(properties,null,new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                logger.info("### Received a Session event: %s%n", event);
+                logger.info("### Received a Session event: " + event);
             }
         });
         session.connect();
@@ -84,7 +86,6 @@ public class GuaranteedSubscriber {
         flow_prop.setAckMode(JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
         flow_prop.setActiveFlowIndication(true);  // Flow events will advise when 
 
-        final FlowReceiver flowQueueReceiver;
         System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
         try {
             // see bottom of file for QueueFlowListener class, which receives the messages from the queue
@@ -92,7 +93,7 @@ public class GuaranteedSubscriber {
                 @Override
                 public void handleEvent(Object source, FlowEventArgs event) {
                     // Flow events are usually: active, reconnecting (i.e. unbound), reconnected
-                    logger.info("### Received a Flow event: %s%n", event);
+                    logger.info("### Received a Flow event: " + event);
                 }
             });
         } catch (OperationNotSupportedException e) {  // not allowed to do this
@@ -157,6 +158,10 @@ public class GuaranteedSubscriber {
             logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception", e);
             if (e instanceof JCSMPTransportException) {
                 isShutdown = true;  // let's quit
+            } else {
+                // Generally unrecoverable exception, probably need to recreate and restart the flow
+                flowQueueReceiver.close();
+                // add logic in main thread to restart FlowReceiver, or can exit the program
             }
         }
     }

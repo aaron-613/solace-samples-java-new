@@ -85,7 +85,7 @@ public class GuaranteedPublisher {
         session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
             public void handleEvent(SessionEventArgs event) {  // could be reconnecting, connection lost, etc.
-                logger.info("### Received a Session event: %s%n", event);
+                logger.info("### Received a Session event: " + event);
             }
         });
         session.connect();
@@ -122,8 +122,7 @@ public class GuaranteedPublisher {
                     producer.send(message, topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
                     msgSentCounter++;
                     try {
-                        //Thread.sleep(0);
-                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;
@@ -132,6 +131,7 @@ public class GuaranteedPublisher {
             } catch (JCSMPException e) {
                 e.printStackTrace();
             } finally {
+                publishThread.shutdown();
                 logger.info("Publisher Thread shutdown");
             }
         });
@@ -143,7 +143,7 @@ public class GuaranteedPublisher {
             System.out.printf("Published msgs/s: %,d%n", msgSentCounter);  // simple way of calculating message rates
             msgSentCounter = 0;
         }
-        isShutdown = true;
+        isShutdown = true;   // will stop the publish thread
         Thread.sleep(1500);  // give time for the ACKs to arrive from the broker
         session.closeSession();
         System.out.println("Main thread quitting.");
