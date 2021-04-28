@@ -109,7 +109,7 @@ public class GuaranteedSubscriber {
                     GuaranteedPublisher.TOPIC_PREFIX+"/pers/>");
             System.out.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
-            System.out.println("NOTE: see GuaranteedQueueProvision sample for how to construct queue with consumer app.");
+            System.out.println("NOTE: see Queue Provision sample for how to construct queue with consumer app.");
             System.out.println("Exiting.");
             return;
         }
