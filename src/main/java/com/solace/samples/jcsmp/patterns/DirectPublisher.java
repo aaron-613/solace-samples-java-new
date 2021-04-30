@@ -121,8 +121,8 @@ public class DirectPublisher {
                     msgSentCounter++;  // add one
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
                     try {
-                        //Thread.sleep(0);
-                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        Thread.sleep(0);
+                        //Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;

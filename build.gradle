@@ -80,25 +80,25 @@ tasks.withType(JavaCompile).all {
 }
 
 def scripts = [
-    'HelloWorld':'com.solace.samples.HelloWorld',
-    'DirectProcessor':'com.solace.samples.patterns.DirectProcessor',
-    'DirectPublisher':'com.solace.samples.patterns.DirectPublisher',
-    'DirectReplier':'com.solace.samples.patterns.DirectReplier',
-    'DirectRequestorBlocking':'com.solace.samples.patterns.DirectRequestorBlocking',
-    'DirectSubscriber':'com.solace.samples.patterns.DirectSubscriber',
-    'GuaranteedProcessor':'com.solace.samples.patterns.GuaranteedProcessor',
-    'GuaranteedPublisher':'com.solace.samples.patterns.GuaranteedPublisher',
-    'GuaranteedPublisherAckTrack':'com.solace.samples.patterns.GuaranteedPublisherAckTrack',
-    'GuaranteedReplier':'com.solace.samples.patterns.GuaranteedReplier',
-    'GuaranteedRequestor':'com.solace.samples.patterns.GuaranteedRequestor',
-    'GuaranteedSubscriber':'com.solace.samples.patterns.GuaranteedSubscriber',
-    'TransactedProcessor':'com.solace.samples.patterns.TransactedProcessor',
-    'featureMessageSelectorsOnQueue':'com.solace.samples.samplers.MessageSelectorsOnQueue',
-    'featureMessageTTLAndDeadMessageQueue':'com.solace.samples.samplers.MessageTTLAndDeadMessageQueue',
-    'featureQueueProvisionAndBrowse':'com.solace.samples.samplers.QueueProvisionAndBrowse',
-    'featureQueueProvisionAndRequestActiveFlowIndication':'com.solace.samples.samplers.QueueProvisionAndRequestActiveFlowIndication',
-    'featureTransactions':'com.solace.samples.samplers.Transactions',
-    'featureMessageReplay':'com.solace.samples.samplers.MessageReplay'
+    'HelloWorld':'com.solace.samples.jcsmp.HelloWorld',
+    'DirectProcessor':'com.solace.samples.jcsmp.patterns.DirectProcessor',
+    'DirectPublisher':'com.solace.samples.jcsmp.patterns.DirectPublisher',
+    'DirectReplier':'com.solace.samples.jcsmp.patterns.DirectReplier',
+    'DirectRequestorBlocking':'com.solace.samples.jcsmp.patterns.DirectRequestorBlocking',
+    'DirectSubscriber':'com.solace.samples.jcsmp.patterns.DirectSubscriber',
+    'GuaranteedProcessor':'com.solace.samples.jcsmp.patterns.GuaranteedProcessor',
+    'GuaranteedPublisher':'com.solace.samples.jcsmp.patterns.GuaranteedPublisher',
+    'GuaranteedPublisherAckTrack':'com.solace.samples.jcsmp.patterns.GuaranteedPublisherAckTrack',
+    'GuaranteedReplier':'com.solace.samples.jcsmp.patterns.GuaranteedReplier',
+    'GuaranteedRequestor':'com.solace.samples.jcsmp.patterns.GuaranteedRequestor',
+    'GuaranteedSubscriber':'com.solace.samples.jcsmp.patterns.GuaranteedSubscriber',
+    'TransactedProcessor':'com.solace.samples.jcsmp.patterns.TransactedProcessor',
+    'featureMessageSelectorsOnQueue':'com.solace.samples.jcsmp.samplers.MessageSelectorsOnQueue',
+    'featureMessageTTLAndDeadMessageQueue':'com.solace.samples.jcsmp.samplers.MessageTTLAndDeadMessageQueue',
+    'featureQueueProvisionAndBrowse':'com.solace.samples.jcsmp.samplers.QueueProvisionAndBrowse',
+    'featureQueueProvisionAndRequestActiveFlowIndication':'com.solace.samples.jcsmp.samplers.QueueProvisionAndRequestActiveFlowIndication',
+    'featureTransactions':'com.solace.samples.jcsmp.samplers.Transactions',
+    'featureMessageReplay':'com.solace.samples.jcsmp.samplers.MessageReplay'
 ]
 scripts.each() { scriptName, className ->
     def t = tasks.create(name: scriptName+'StartScript', type: CreateStartScripts) {

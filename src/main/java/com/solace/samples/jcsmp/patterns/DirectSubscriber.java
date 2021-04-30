@@ -19,8 +19,6 @@
 
 package com.solace.samples.jcsmp.patterns;
 
-import java.io.IOException;
-
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -32,6 +30,7 @@ import com.solacesystems.jcsmp.SessionEventArgs;
 import com.solacesystems.jcsmp.SessionEventHandler;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageListener;
+import java.io.IOException;
 
 /** This is a more detailed subscriber sample. */
 public class DirectSubscriber {
@@ -89,7 +88,7 @@ public class DirectSubscriber {
                     hasDetectedDiscard = true;  // set my own flag
                 }
                 if (message.getDestination().getName().endsWith("control/quit")) {  // special sample message
-                    System.out.println("QUIT message received, shutting down.");  // exampe of command-and-control w/msgs
+                    System.out.println("QUIT message received, shutting down.");  // example of command-and-control w/msgs
                     isShutdown = true;
                 }
             }
