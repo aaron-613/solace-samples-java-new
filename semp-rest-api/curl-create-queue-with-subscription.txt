@@ -22,4 +22,4 @@ curl http://localhost:8080/SEMP/v2/config/msgVpns/default/queues/q_samples/subsc
   -X POST \
   -u admin:admin \
   -H "Content-type:application/json" \
-  -d '{ "subscriptionTopic": "solace/samples/pers/pub/>" }'
+  -d '{ "subscriptionTopic": "solace/samples/*/pers/pub/>" }'

@@ -49,7 +49,7 @@ import org.apache.logging.log4j.Logger;
 public class GuaranteedProcessor {
 
     private static final String SAMPLE_NAME = GuaranteedProcessor.class.getSimpleName();
-    static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
     private static final int PUBLISH_WINDOW_SIZE = 100;
     private static final String QUEUE_NAME = "q_pers_proc";
     
@@ -120,13 +120,12 @@ public class GuaranteedProcessor {
             throw e;
         } catch (JCSMPErrorResponseException e) {  // something else went wrong: queue not exist, queue shutdown, etc.
             logger.error(e);
-            System.out.printf("%n*** Could not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
-            System.out.println("Create queue using PubSub+ Manager WebGUI, and add subscription "+
-                    GuaranteedPublisher.TOPIC_PREFIX+"/pers/>");
-            System.out.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
+            System.err.printf("%n*** Could not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
+            System.err.println("Create queue using PubSub+ Manager WebGUI, and add subscription "+ TOPIC_PREFIX+"*/pers/>");
+            System.err.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
-            System.out.println("NOTE: see Queue Provision sample for how to construct queue with consumer app.");
-            System.out.println("Exiting.");
+            System.err.println("NOTE: see Queue Provision sample for how to construct queue with consumer app.");
+            System.err.println("Exiting.");
             return;
         }
         // tell the broker to start sending messages on this queue receiver
@@ -143,7 +142,7 @@ public class GuaranteedProcessor {
             }
             msgRecvCounter++;
             String inboundTopic = inboundMsg.getDestination().getName();
-            if (inboundTopic.startsWith(TOPIC_PREFIX + "/pers/pub")) {
+            if (inboundTopic.matches(TOPIC_PREFIX + ".+?/pers/pub/.*")) {  // use of regex to match variable API level
                 // how to "process" the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
                 TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
                 final String upperCaseTopic = inboundTopic.toUpperCase();  // as a silly example of "processing"
@@ -153,8 +152,8 @@ public class GuaranteedProcessor {
                 }
                 outboundMsg.setDeliveryMode(DeliveryMode.PERSISTENT);
                 outboundMsg.setCorrelationKey(new ProcessorCorrelationKey(inboundMsg, outboundMsg));  // need to wait for publish ACK
-                String [] inboundTopicLevels = inboundTopic.split("/",5);
-                String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/pers/upper/").append(inboundTopicLevels[4]).toString();
+                String [] inboundTopicLevels = inboundTopic.split("/",6);
+                String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("jcsmp/pers/upper/").append(inboundTopicLevels[5]).toString();
                 try {
                     producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                 } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)

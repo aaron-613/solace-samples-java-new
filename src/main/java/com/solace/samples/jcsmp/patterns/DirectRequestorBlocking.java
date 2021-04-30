@@ -43,7 +43,7 @@ import java.io.IOException;
 public class DirectRequestorBlocking {
 
     private static final String SAMPLE_NAME = DirectRequestorBlocking.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
     private static final int REQUEST_TIMEOUT_MS = 3000;  // time to wait for a reply before timing out
 
     private static volatile int msgSentCounter = 0;                   // num messages sent
@@ -104,7 +104,7 @@ public class DirectRequestorBlocking {
         while (System.in.available() == 0 && !isShutdown) {
             try {
                 requestMsg.setText(String.format("Hello, this is reqeust #%d", msgSentCounter));
-                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/request");
+                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "jcsmp/direct/request");
                 System.out.printf(">> About to send request message #%d to topic '%s'...%n", msgSentCounter, topic.getName());
                 Requestor requestor = session.createRequestor();  // create the useful Requestor object, Direct only
                 msgSentCounter++;  // add one

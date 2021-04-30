@@ -105,13 +105,13 @@ public class GuaranteedSubscriber {
             throw e;
         } catch (JCSMPErrorResponseException e) {  // something else went wrong: queue not exist, queue shutdown, etc.
             logger.error(e);
-            System.out.printf("%n*** Could not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
-            System.out.println("Create queue using PubSub+ Manager WebGUI, and add subscription "+
-                    GuaranteedPublisher.TOPIC_PREFIX+"/pers/>");
-            System.out.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
+            System.err.printf("%n*** Could not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
+            System.err.println("Create queue using PubSub+ Manager WebGUI, and add subscription "+
+                    GuaranteedPublisher.TOPIC_PREFIX+"*/pers/>");
+            System.err.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
-            System.out.println("NOTE: see Queue Provision sample for how to construct queue with consumer app.");
-            System.out.println("Exiting.");
+            System.err.println("NOTE: see Queue Provision sample for how to construct queue with consumer app.");
+            System.err.println("Exiting.");
             return;
         }
         // tell the broker to start sending messages on this queue receiver
@@ -123,7 +123,7 @@ public class GuaranteedSubscriber {
                 Thread.sleep(1000);  // wait 1 second
                 System.out.printf("Received msgs/s: %,d%n", msgRecvCounter);  // simple way of calculating message rates
                 msgRecvCounter = 0;
-                if (hasDetectedRedelivery) {
+                if (hasDetectedRedelivery) {  // try shutting -> enabling the queue on the broker to see this
                     System.out.println("*** Redelivery detected ***");
                     hasDetectedRedelivery = false;  // only show the error once per second
                 }

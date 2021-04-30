@@ -38,7 +38,7 @@ import java.io.IOException;
 public class DirectReplier {
 
     private static final String SAMPLE_NAME = DirectReplier.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
 
     private static volatile boolean isShutdown = false;
 
@@ -122,11 +122,11 @@ public class DirectReplier {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/*/direct/request"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/request"));
         // for use with Solace HTTP MicroGateway feature, will respond to REST GET request on same URI
-        // try doing: curl -u default:default http://localhost:9000/solace/samples/direct/request
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/" + TOPIC_PREFIX + "/*/direct/request"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/control/>"));
+        // try doing: curl -u default:default http://localhost:9000/solace/samples/rest/direct/request
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/" + TOPIC_PREFIX + "*/direct/request"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "control/>"));
         cons.start();
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");

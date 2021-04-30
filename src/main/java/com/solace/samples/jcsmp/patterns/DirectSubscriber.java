@@ -36,7 +36,7 @@ import java.io.IOException;
 public class DirectSubscriber {
 
     private static final String SAMPLE_NAME = DirectSubscriber.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
 
     private static volatile int msgRecvCounter = 0;              // num messages received
     private static volatile boolean hasDetectedDiscard = false;  // detected any discards yet?
@@ -88,7 +88,7 @@ public class DirectSubscriber {
                     hasDetectedDiscard = true;  // set my own flag
                 }
                 if (message.getDestination().getName().endsWith("control/quit")) {  // special sample message
-                    System.out.println("QUIT message received, shutting down.");  // example of command-and-control w/msgs
+                    System.out.println(">>> QUIT message received, shutting down.");  // example of command-and-control w/msgs
                     isShutdown = true;
                 }
             }
@@ -102,8 +102,8 @@ public class DirectSubscriber {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/control/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "control/>"));
         consumer.start();
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {

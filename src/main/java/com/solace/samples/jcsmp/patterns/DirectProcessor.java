@@ -47,7 +47,7 @@ import java.io.IOException;
 public class DirectProcessor {
 
     private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
     
     private static volatile boolean isShutdown = false;  // are we done yet?
 
@@ -108,7 +108,7 @@ public class DirectProcessor {
             @Override
             public void onReceive(BytesXMLMessage inboundMsg) {
                 String inboundTopic = inboundMsg.getDestination().getName();
-                if (inboundTopic.startsWith(TOPIC_PREFIX + "/*/direct/pub")) {
+                if (inboundTopic.matches(TOPIC_PREFIX + ".+?/direct/pub/.*")) {  // use of regex to match variable API level
                     // how to "process" the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
                     final String upperCaseMessage = inboundTopic.toUpperCase();  // as a silly example of "processing"
@@ -116,8 +116,8 @@ public class DirectProcessor {
                     if (inboundMsg.getApplicationMessageId() != null) {
                         outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
                     }
-                    String [] inboundTopicLevels = inboundTopic.split("/");
-                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/jcsmp/direct/upper/").append(inboundTopicLevels[4]).toString();
+                    String [] inboundTopicLevels = inboundTopic.split("/",6);
+                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("jcsmp/direct/upper/").append(inboundTopicLevels[5]).toString();
                     try {
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                     } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
@@ -126,8 +126,9 @@ public class DirectProcessor {
                             isShutdown = true;
                         }
                     }
-                } else {  // wasn't expecting this..?
-                    System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",inboundMsg.dump());  // just print
+                } else if (inboundMsg.getDestination().getName().endsWith("control/quit")) {  // special sample message
+                    System.out.println(">>> QUIT message received, shutting down.");  // example of command-and-control w/msgs
+                    isShutdown = true;
                 }
             }
 
@@ -136,7 +137,8 @@ public class DirectProcessor {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/*/direct/pub/>"));  // listen to
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/pub/>"));  // listen to
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "control/>"));
         cons.start();
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");

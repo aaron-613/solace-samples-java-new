@@ -49,7 +49,7 @@ import org.apache.logging.log4j.Logger;
 public class GuaranteedPublisher {
     
     private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
-    static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
 
     private static final int PUBLISH_WINDOW_SIZE = 50;
     private static final int APPROX_MSG_RATE_PER_SEC = 100;
@@ -101,7 +101,7 @@ public class GuaranteedPublisher {
         ExecutorService publishThread = Executors.newSingleThreadExecutor();
         publishThread.submit(() -> {
             byte[] payload = new byte[PAYLOAD_SIZE];
-            System.out.println("Publishing to topic '"+ TOPIC_PREFIX + "/pers/pub/...', please ensure queue has subscription."); 
+            System.out.println("Publishing to topic '"+ TOPIC_PREFIX + "jcsmp/pers/pub/...', please ensure queue has matching subscription."); 
             try {
                 while (!isShutdown) {
                     BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
@@ -117,7 +117,7 @@ public class GuaranteedPublisher {
                     map.putString("sample","JCSMP GuaranteedPublisher");
                     message.setProperties(map);
                     message.setCorrelationKey(message);  // used for ACK/NACK correlation locally within the API
-                    String topicString = new StringBuilder(TOPIC_PREFIX).append("/pers/pub/").append(chosenCharacter).toString();
+                    String topicString = new StringBuilder(TOPIC_PREFIX).append("jcsmp/pers/pub/").append(chosenCharacter).toString();
                     // NOTE: publishing to topic, so make sure GuaranteedSubscriber queue is subscribed to same topic
                     Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
                     producer.send(message, topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler

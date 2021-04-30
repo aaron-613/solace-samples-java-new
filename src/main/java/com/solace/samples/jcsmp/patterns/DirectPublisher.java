@@ -44,7 +44,7 @@ import java.util.concurrent.Executors;
 public class DirectPublisher {
     
     private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
     private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 100;
     
@@ -52,7 +52,7 @@ public class DirectPublisher {
     private static volatile boolean isShutdown = false;
 
     /** Main method. */
-    public static void main(String... args) throws JCSMPException, IOException {
+    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
@@ -116,7 +116,7 @@ public class DirectPublisher {
                     message.setData(payload);
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
                     // dynamic topics!!
-                    String topicString = new StringBuilder(TOPIC_PREFIX).append("/jcsmp/direct/pub/").append(chosenCharacter).toString();
+                    String topicString = new StringBuilder(TOPIC_PREFIX).append("jcsmp/direct/pub/").append(chosenCharacter).toString();
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
@@ -134,6 +134,11 @@ public class DirectPublisher {
                     }
                 }
             }
+            try {  // try to send a QUIT message to the other applications... (as an example of command-and-control)
+                message.reset();
+                producer.send(message,JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"control/quit"));
+            } catch (JCSMPException e) {
+            }
             publishExecutor.shutdown();
         });
 
@@ -149,6 +154,7 @@ public class DirectPublisher {
             }
         }
         isShutdown = true;
+        Thread.sleep(500);
         session.closeSession();  // will also close producer object
         System.out.println("Main thread quitting.");
     }

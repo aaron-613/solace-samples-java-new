@@ -40,7 +40,7 @@ import java.io.InputStreamReader;
 public class HelloWorld {
     
     private static final String SAMPLE_NAME = HelloWorld.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static volatile boolean isShutdown = false;           // are we done yet?
 
     /** Simple application for doing pubsub. */
