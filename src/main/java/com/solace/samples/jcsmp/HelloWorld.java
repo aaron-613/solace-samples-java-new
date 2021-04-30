@@ -40,7 +40,7 @@ import java.io.InputStreamReader;
 public class HelloWorld {
     
     private static final String SAMPLE_NAME = HelloWorld.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
     private static volatile boolean isShutdown = false;           // are we done yet?
 
     /** Simple application for doing pubsub. */
@@ -105,7 +105,7 @@ public class HelloWorld {
         });
 
         // Ready to start the application, just add one subscription
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/*/hello/>"));    // use wildcards
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/hello/>"));    // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
         System.out.printf("%nConnected and subscribed. Ready to publish. Press [ENTER] to quit.%n");
         System.out.printf(" ~ Run this sample twice splitscreen to see true publish-subscribe. ~%n%n");
@@ -116,8 +116,8 @@ public class HelloWorld {
                 Thread.sleep(5000);  // take a pause
                 // specify a text payload
                 message.setText(String.format("Hello World from %s!",uniqueName));
-                // make a dynamic topic: solace/samples/hello/[uniqueName]
-                String topicString = String.format("%s/jcsmp/hello/%s", TOPIC_PREFIX, uniqueName.toLowerCase());
+                // make a dynamic topic: solace/samples/jcsmp/hello/[uniqueName]
+                String topicString = TOPIC_PREFIX + "jcsmp/hello/" + uniqueName.toLowerCase();
                 System.out.printf(">> Calling send() on %s%n",topicString);
                 producer.send(message, JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it
