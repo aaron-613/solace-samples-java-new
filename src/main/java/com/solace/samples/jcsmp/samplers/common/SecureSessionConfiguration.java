@@ -4,7 +4,7 @@
  * Copyright 2006-2018 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers.jcsmp.common;
+package com.solace.samples.jcsmp.samplers.common;
 
 
 public class SecureSessionConfiguration extends SessionConfiguration {

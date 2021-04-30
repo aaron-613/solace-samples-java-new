@@ -18,10 +18,10 @@
 
 package com.solace.samples.jcsmp.samplers;
 
-import com.solace.samples.samplers.jcsmp.common.ArgParser;
-import com.solace.samples.samplers.jcsmp.common.SampleApp;
-import com.solace.samples.samplers.jcsmp.common.SecureSessionConfiguration;
-import com.solace.samples.samplers.jcsmp.common.SessionConfiguration.AuthenticationScheme;
+import com.solace.samples.jcsmp.samplers.common.ArgParser;
+import com.solace.samples.jcsmp.samplers.common.SampleApp;
+import com.solace.samples.jcsmp.samplers.common.SecureSessionConfiguration;
+import com.solace.samples.jcsmp.samplers.common.SessionConfiguration.AuthenticationScheme;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.FlowReceiver;

@@ -4,7 +4,7 @@
  * Copyright 2009-2018 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers.jcsmp.common;
+package com.solace.samples.jcsmp.samplers.common;
 
 import java.util.ArrayList;
 import java.util.Arrays;

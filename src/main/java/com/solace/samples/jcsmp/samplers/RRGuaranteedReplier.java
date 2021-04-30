@@ -21,9 +21,9 @@ package com.solace.samples.jcsmp.samplers;
 
 import java.util.Calendar;
 import java.util.Map;
-import com.solace.samples.samplers.jcsmp.common.ArgParser;
-import com.solace.samples.samplers.jcsmp.common.SampleApp;
-import com.solace.samples.samplers.jcsmp.common.SessionConfiguration;
+import com.solace.samples.jcsmp.samplers.common.ArgParser;
+import com.solace.samples.jcsmp.samplers.common.SampleApp;
+import com.solace.samples.jcsmp.samplers.common.SessionConfiguration;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.DeliveryMode;
