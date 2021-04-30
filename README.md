@@ -22,7 +22,7 @@ These will be proper little messaging applications, looping, publishing multiple
     - Publish-Subscribe
     - Processor
     - Request-Reply
-    - Proxy (?)
+    - Adapter (?)
  - Guaranteed
     - Publish-Subscribe
     - Processor
