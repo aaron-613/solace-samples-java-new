@@ -13,11 +13,11 @@
 
 package com.solace.samples.jcsmp.samplers;
 
-import com.solace.samples.samplers.common.ArgParser;
-import com.solace.samples.samplers.common.SampleApp;
-import com.solace.samples.samplers.common.SampleUtils;
-import com.solace.samples.samplers.common.SessionConfiguration;
-import com.solace.samples.samplers.common.SessionConfiguration.AuthenticationScheme;
+import com.solace.samples.samplers.jcsmp.common.ArgParser;
+import com.solace.samples.samplers.jcsmp.common.SampleApp;
+import com.solace.samples.samplers.jcsmp.common.SampleUtils;
+import com.solace.samples.samplers.jcsmp.common.SessionConfiguration;
+import com.solace.samples.samplers.jcsmp.common.SessionConfiguration.AuthenticationScheme;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.DeliveryMode;

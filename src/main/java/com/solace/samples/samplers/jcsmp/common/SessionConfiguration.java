@@ -6,11 +6,11 @@
  * Copyright 2006-2018 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers.common;
+package com.solace.samples.samplers.jcsmp.common;
 
 import java.util.HashMap;
 import java.util.Map;
-import com.solace.samples.samplers.common.SampleUtils.UserVpn;
+import com.solace.samples.samplers.jcsmp.common.SampleUtils.UserVpn;
 import com.solacesystems.jcsmp.DeliveryMode;
 
 public class SessionConfiguration {

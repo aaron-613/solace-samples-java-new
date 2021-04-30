@@ -4,10 +4,10 @@
  * Copyright 2009-2018 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers.common;
+package com.solace.samples.samplers.jcsmp.common;
 
-import com.solace.samples.samplers.common.SampleUtils.UserVpn;
-import com.solace.samples.samplers.common.SessionConfiguration.AuthenticationScheme;
+import com.solace.samples.samplers.jcsmp.common.SampleUtils.UserVpn;
+import com.solace.samples.samplers.jcsmp.common.SessionConfiguration.AuthenticationScheme;
 import com.solacesystems.jcsmp.CacheLiveDataAction;
 import com.solacesystems.jcsmp.DeliveryMode;
 

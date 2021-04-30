@@ -6,11 +6,11 @@
  * Copyright 2006-2018 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers.common;
+package com.solace.samples.samplers.jcsmp.common;
 
 import java.util.Map;
 import java.util.Map.Entry;
-import com.solace.samples.samplers.common.SessionConfiguration.AuthenticationScheme;
+import com.solace.samples.samplers.jcsmp.common.SessionConfiguration.AuthenticationScheme;
 import com.solacesystems.jcsmp.CacheSession;
 import com.solacesystems.jcsmp.CacheSessionProperties;
 import com.solacesystems.jcsmp.InvalidPropertiesException;

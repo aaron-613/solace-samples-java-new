@@ -40,7 +40,7 @@ import java.io.InputStreamReader;
 public class HelloWorld {
     
     private static final String SAMPLE_NAME = HelloWorld.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "samples";  // used as the topic "root"
     private static volatile boolean isShutdown = false;           // are we done yet?
 
     /** Simple application for doing pubsub. */
@@ -92,7 +92,7 @@ public class HelloWorld {
             @Override
             public void onReceive(BytesXMLMessage message) {
                 // could be 4 different message types: 3 SMF ones (Text, Map, Stream) and just plain binary
-                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s%n",message.dump());  // just print
+                System.out.printf("vvv RECEIVED A MESSAGE vvv%n%s===%n",message.dump());  // just print
             }
 
             @Override
@@ -105,10 +105,10 @@ public class HelloWorld {
         });
 
         // Ready to start the application, just add one subscription
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/hello/>"));    // use wildcards
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/*/hello/>"));    // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
         System.out.printf("%nConnected and subscribed. Ready to publish. Press [ENTER] to quit.%n");
-        System.out.printf(" ~ Run this sample twice to see true publish-subscribe. ~%n%n");
+        System.out.printf(" ~ Run this sample twice splitscreen to see true publish-subscribe. ~%n%n");
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (System.in.available() == 0 && !isShutdown) {  // loop now, just use main thread
@@ -117,7 +117,7 @@ public class HelloWorld {
                 // specify a text payload
                 message.setText(String.format("Hello World from %s!",uniqueName));
                 // make a dynamic topic: solace/samples/hello/[uniqueName]
-                String topicString = String.format("%s/hello/%s", TOPIC_PREFIX, uniqueName.toLowerCase());
+                String topicString = String.format("%s/jcsmp/hello/%s", TOPIC_PREFIX, uniqueName.toLowerCase());
                 System.out.printf(">> Calling send() on %s%n",topicString);
                 producer.send(message, JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it

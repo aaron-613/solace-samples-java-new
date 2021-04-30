@@ -10,10 +10,10 @@
 package com.solace.samples.jcsmp.samplers;
 
 import java.util.LinkedList;
-import com.solace.samples.samplers.common.ArgParser;
-import com.solace.samples.samplers.common.SampleApp;
-import com.solace.samples.samplers.common.SessionConfiguration;
-import com.solace.samples.samplers.common.SessionConfiguration.AuthenticationScheme;
+import com.solace.samples.samplers.jcsmp.common.ArgParser;
+import com.solace.samples.samplers.jcsmp.common.SampleApp;
+import com.solace.samples.samplers.jcsmp.common.SessionConfiguration;
+import com.solace.samples.samplers.jcsmp.common.SessionConfiguration.AuthenticationScheme;
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.InvalidPropertiesException;
