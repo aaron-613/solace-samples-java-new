@@ -47,7 +47,7 @@ import java.io.IOException;
 public class DirectProcessor {
 
     private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace";  // used as the topic "root"
     
     private static volatile boolean isShutdown = false;  // are we done yet?
 
@@ -108,7 +108,7 @@ public class DirectProcessor {
             @Override
             public void onReceive(BytesXMLMessage inboundMsg) {
                 String inboundTopic = inboundMsg.getDestination().getName();
-                if (inboundTopic.startsWith(TOPIC_PREFIX + "/direct/pub")) {
+                if (inboundTopic.startsWith(TOPIC_PREFIX + "/*/direct/pub")) {
                     // how to "process" the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
                     final String upperCaseMessage = inboundTopic.toUpperCase();  // as a silly example of "processing"
@@ -117,7 +117,7 @@ public class DirectProcessor {
                         outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
                     }
                     String [] inboundTopicLevels = inboundTopic.split("/");
-                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/direct/upper/").append(inboundTopicLevels[4]).toString();
+                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("/jcsmp/direct/upper/").append(inboundTopicLevels[4]).toString();
                     try {
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
                     } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
@@ -136,7 +136,7 @@ public class DirectProcessor {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/pub/>"));  // listen to
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/*/direct/pub/>"));  // listen to
         cons.start();
 
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");

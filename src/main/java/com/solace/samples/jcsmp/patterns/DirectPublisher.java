@@ -44,7 +44,7 @@ import java.util.concurrent.Executors;
 public class DirectPublisher {
     
     private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "samples";  // used as the topic "root"
     private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 100;
     
@@ -116,13 +116,13 @@ public class DirectPublisher {
                     message.setData(payload);
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
                     // dynamic topics!!
-                    String topicString = new StringBuilder(TOPIC_PREFIX).append("/direct/pub/").append(chosenCharacter).toString();
+                    String topicString = new StringBuilder(TOPIC_PREFIX).append("/jcsmp/direct/pub/").append(chosenCharacter).toString();
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
                     try {
-                        Thread.sleep(0);
-                        //Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        //Thread.sleep(0);
+                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;
