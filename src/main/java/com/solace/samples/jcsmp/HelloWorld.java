@@ -57,7 +57,7 @@ public class HelloWorld {
             uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
         }
         
-        System.out.println(SAMPLE_NAME + " initializing...");
+        System.out.println(SAMPLE_NAME + " JCSMP initializing...");
         // Build the properties object for initializing the JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -108,7 +108,7 @@ public class HelloWorld {
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/hello/>"));    // use wildcards
         consumer.start();  // turn on the subs, and start receiving data
         System.out.printf("%nConnected and subscribed. Ready to publish. Press [ENTER] to quit.%n");
-        System.out.printf(" - Run this sample twice to see true publish-subscribe. -%n%n");
+        System.out.printf(" ~ Run this sample twice to see true publish-subscribe. ~%n%n");
 
         TextMessage message = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
         while (System.in.available() == 0 && !isShutdown) {  // loop now, just use main thread
