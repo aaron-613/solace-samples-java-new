@@ -117,9 +117,9 @@ public class DirectProcessor {
                         outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
                     }
                     String [] inboundTopicLevels = inboundTopic.split("/",6);
-                    String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("jcsmp/direct/upper/").append(inboundTopicLevels[5]).toString();
+                    String outboundTopic = new StringBuilder(TOPIC_PREFIX).append("jcsmp/direct/upper/").append(inboundTopicLevels[5]).toString();
                     try {
-                        producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
+                        producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(outboundTopic));
                     } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
                         System.out.printf("### Caught while trying to producer.send(): %s%n",e);
                         if (e instanceof JCSMPTransportException) {  // unrecoverable
