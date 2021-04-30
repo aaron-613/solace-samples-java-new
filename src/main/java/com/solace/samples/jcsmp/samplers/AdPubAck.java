@@ -34,7 +34,7 @@
  * Copyright 2012-2020 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers;
+package com.solace.samples.jcsmp.samplers;
 
 import java.util.LinkedList;
 import com.solace.samples.samplers.common.ArgParser;

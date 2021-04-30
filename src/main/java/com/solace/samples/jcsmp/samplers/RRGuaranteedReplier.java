@@ -17,7 +17,7 @@
  * Copyright 2013-2020 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers;
+package com.solace.samples.jcsmp.samplers;
 
 import java.util.Calendar;
 import java.util.Map;

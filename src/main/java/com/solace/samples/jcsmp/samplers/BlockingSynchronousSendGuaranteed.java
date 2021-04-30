@@ -1,4 +1,4 @@
-package com.solace.samples.samplers;
+package com.solace.samples.jcsmp.samplers;
 
 // This example demonstrates how to implement a blocking, synchronous send
 // method using the JCSMP API's non-blocking, asynchronous send method and

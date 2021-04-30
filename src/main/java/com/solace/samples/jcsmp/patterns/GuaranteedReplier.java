@@ -25,7 +25,7 @@
  * under the License.
  */
 
-package com.solace.samples.patterns;
+package com.solace.samples.jcsmp.patterns;
 
 public class GuaranteedReplier {
 

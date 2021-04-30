@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples;
+package com.solace.samples.jcsmp;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.JCSMPException;

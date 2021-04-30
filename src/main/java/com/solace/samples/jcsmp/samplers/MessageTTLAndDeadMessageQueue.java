@@ -9,7 +9,7 @@
  * Copyright 2011-2018 Solace Corporation. All rights reserved.
  */
 
-package com.solace.samples.samplers;
+package com.solace.samples.jcsmp.samplers;
 
 import java.util.Calendar;
 import java.util.HashMap;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.solace.samples.patterns;
+package com.solace.samples.jcsmp.patterns;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;

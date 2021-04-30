@@ -1,4 +1,4 @@
-package com.solace.samples.samplers;
+package com.solace.samples.jcsmp.samplers;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
