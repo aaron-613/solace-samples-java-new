@@ -122,13 +122,10 @@ public class DirectReplier {
             }
         });
 
-        // topic to listen to incoming (messaging) requests, using a special wildcard borrowed from MQTT:
-        // https://docs.solace.com/Open-APIs-Protocols/MQTT/MQTT-Topics.htm#Using
-        // will match "solace/samples/direct/request" as well as "solace/samples/direct/request/anything/else"
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/request/\u0003"));
-        // for use with HTTP MicroGateway feature, will respond to REST GET request on same URI
-        // try doing: curl -u default:default http://localhost:9000/solace/samples/direct/request/hello
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/" + TOPIC_PREFIX + "/direct/request/\u0003"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/*/direct/request"));
+        // for use with Solace HTTP MicroGateway feature, will respond to REST GET request on same URI
+        // try doing: curl -u default:default http://localhost:9000/solace/samples/direct/request
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/" + TOPIC_PREFIX + "/*/direct/request"));
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/control/>"));
         cons.start();
 

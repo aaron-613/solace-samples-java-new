@@ -44,7 +44,7 @@ import java.util.concurrent.Executors;
 public class DirectPublisher {
     
     private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "samples";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 100;
     

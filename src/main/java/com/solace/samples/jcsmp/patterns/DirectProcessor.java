@@ -47,7 +47,7 @@ import java.io.IOException;
 public class DirectProcessor {
 
     private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
-    private static final String TOPIC_PREFIX = "solace";  // used as the topic "root"
+    private static final String TOPIC_PREFIX = "solace/samples";  // used as the topic "root"
     
     private static volatile boolean isShutdown = false;  // are we done yet?
 
