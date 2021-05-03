@@ -37,6 +37,7 @@ public class DirectSubscriber {
 
     private static final String SAMPLE_NAME = DirectSubscriber.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
 
     private static volatile int msgRecvCounter = 0;              // num messages received
     private static volatile boolean hasDetectedDiscard = false;  // detected any discards yet?
@@ -48,7 +49,7 @@ public class DirectSubscriber {
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME + " initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -109,7 +110,7 @@ public class DirectSubscriber {
         try {
             while (System.in.available() == 0 && !isShutdown) {
                 Thread.sleep(1000);  // wait 1 second
-                System.out.printf("Received msgs/s: %,d%n",msgRecvCounter);  // simple way of calculating message rates
+                System.out.printf("%s Received msgs/s: %,d%n",API,msgRecvCounter);  // simple way of calculating message rates
                 msgRecvCounter = 0;
                 if (hasDetectedDiscard) {
                     System.out.println("*** Egress discard detected *** : "

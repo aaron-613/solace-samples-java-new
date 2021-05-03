@@ -41,6 +41,7 @@ public class HelloWorld {
     
     private static final String SAMPLE_NAME = HelloWorld.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
     private static volatile boolean isShutdown = false;           // are we done yet?
 
     /** Simple application for doing pubsub. */
@@ -57,7 +58,7 @@ public class HelloWorld {
             uniqueName = reader.readLine().trim().replaceAll("\\s+", "_");  // clean up whitespace
         }
         
-        System.out.println(SAMPLE_NAME + " JCSMP initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " JCSMP initializing...");
         // Build the properties object for initializing the JCSMP Session
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -117,7 +118,7 @@ public class HelloWorld {
                 // specify a text payload
                 message.setText(String.format("Hello World from %s!",uniqueName));
                 // make a dynamic topic: solace/samples/jcsmp/hello/[uniqueName]
-                String topicString = TOPIC_PREFIX + "jcsmp/hello/" + uniqueName.toLowerCase();
+                String topicString = TOPIC_PREFIX + API.toLowerCase() + "/hello/" + uniqueName.toLowerCase();
                 System.out.printf(">> Calling send() on %s%n",topicString);
                 producer.send(message, JCSMPFactory.onlyInstance().createTopic(topicString));
                 message.reset();     // reuse this message on the next loop, to avoid having to recreate it

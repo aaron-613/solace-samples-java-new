@@ -45,6 +45,7 @@ public class DirectPublisher {
     
     private static final String SAMPLE_NAME = DirectPublisher.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
     private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 100;
     
@@ -57,7 +58,7 @@ public class DirectPublisher {
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME + " initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -115,21 +116,23 @@ public class DirectPublisher {
                     Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
                     message.setData(payload);
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
-                    // dynamic topics!!
-                    String topicString = new StringBuilder(TOPIC_PREFIX).append("jcsmp/direct/pub/").append(chosenCharacter).toString();
+                    // dynamic topics!!  "solace/samples/jcsmp/direct/pub/A"
+                    String topicString = new StringBuilder(TOPIC_PREFIX).append(API.toLowerCase())
+                            .append("/direct/pub/").append(chosenCharacter).toString();
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
                     message.reset();  // reuse this message, to avoid having to recreate it: better performance
+                } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
+                    System.out.printf("### Caught while trying to producer.send(): %s%n",e);
+                    if (e instanceof JCSMPTransportException) {  // unrecoverable
+                        isShutdown = true;
+                    }
+                } finally {  // add a delay between messages
                     try {
                         //Thread.sleep(0);
                         Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
-                        isShutdown = true;
-                    }
-                } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
-                    System.out.printf("### Caught while trying to producer.send(): %s%n",e);
-                    if (e instanceof JCSMPTransportException) {  // unrecoverable
                         isShutdown = true;
                     }
                 }
@@ -147,7 +150,7 @@ public class DirectPublisher {
         while (System.in.available() == 0 && !isShutdown) {
             try {
                 Thread.sleep(1000);
-                System.out.printf("Published msgs/s: %,d%n",msgSentCounter);  // simple way of calculating message rates
+                System.out.printf("%s Published msgs/s: %,d%n",API,msgSentCounter);  // simple way of calculating message rates
                 msgSentCounter = 0;
             } catch (InterruptedException e) {
                 // Thread.sleep() interrupted... probably getting shut down

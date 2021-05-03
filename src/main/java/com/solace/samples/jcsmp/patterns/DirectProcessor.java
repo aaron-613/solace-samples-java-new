@@ -48,6 +48,7 @@ public class DirectProcessor {
 
     private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
     
     private static volatile boolean isShutdown = false;  // are we done yet?
 
@@ -57,7 +58,7 @@ public class DirectProcessor {
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME + " initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -113,14 +114,15 @@ public class DirectProcessor {
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
                     final String upperCaseMessage = inboundTopic.toUpperCase();  // as a silly example of "processing"
                     outboundMsg.setText(upperCaseMessage);
-                    if (inboundMsg.getApplicationMessageId() != null) {
-                        outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
+                    if (inboundMsg.getApplicationMessageId() != null) {  // populate for traceability
+                        outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());
                     }
                     String [] inboundTopicLevels = inboundTopic.split("/",6);
-                    String outboundTopic = new StringBuilder(TOPIC_PREFIX).append("jcsmp/direct/upper/").append(inboundTopicLevels[5]).toString();
+                    String outboundTopic = new StringBuilder(TOPIC_PREFIX).append(API.toLowerCase())
+                            .append("/direct/upper/").append(inboundTopicLevels[5]).toString();
                     try {
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(outboundTopic));
-                    } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
+                    } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep looping (unless shutdown?)
                         System.out.printf("### Caught while trying to producer.send(): %s%n",e);
                         if (e instanceof JCSMPTransportException) {  // unrecoverable
                             isShutdown = true;
@@ -141,7 +143,7 @@ public class DirectProcessor {
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "control/>"));
         cons.start();
 
-        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
+        System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
             try {
                 Thread.sleep(1000);  // take a pause
