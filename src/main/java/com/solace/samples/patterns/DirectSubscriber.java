@@ -64,6 +64,11 @@ public class DirectSubscriber {
         channelProps.setConnectRetriesPerHost(5);  // recommended settings
         // https://docs.solace.com/Solace-PubSub-Messaging-APIs/API-Developer-Guide/Configuring-Connection-T.htm
         properties.setProperty(JCSMPProperties.CLIENT_CHANNEL_PROPERTIES, channelProps);
+                        
+        // If you are using TLS (necessary in the case of Publishing to an OpenShift route port 443 with passthrough) you need these truststore properties.
+        // properties.setProperty(JCSMPProperties.SSL_TRUST_STORE, "/Users/myuser/projects/solace/truststore.jks");
+        // properties.setProperty(JCSMPProperties.SSL_TRUST_STORE_PASSWORD, "password");
+        
         final JCSMPSession session;
         session = JCSMPFactory.onlyInstance().createSession(properties, null, new SessionEventHandler() {
             @Override
