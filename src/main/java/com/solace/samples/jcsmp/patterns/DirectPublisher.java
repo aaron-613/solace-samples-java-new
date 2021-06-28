@@ -129,7 +129,6 @@ public class DirectPublisher {
                     }
                 } finally {  // add a delay between messages
                     try {
-                        //Thread.sleep(0);
                         Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {

@@ -79,6 +79,7 @@ public class DirectSubscriber {
             public void onReceive(BytesXMLMessage message) {
                 // do not print anything to console... too slow!
                 msgRecvCounter++;
+                // do some message processing here... validate the payload, increment some counters, update some graphics, trigger another event
                 if (message.getDiscardIndication()) {  // since Direct messages, check if there have been any lost any messages
                     // If the consumer is being over-driven (i.e. publish rates too high), the broker might discard some messages for this consumer
                     // check this flag to know if that's happened
@@ -87,10 +88,6 @@ public class DirectSubscriber {
                     //  b) use multiple-threads or shared subscriptions for parallel processing
                     //  c) increase size of consumer's D-1 egress buffers (check client-profile) (helps more with bursts)
                     hasDetectedDiscard = true;  // set my own flag
-                }
-                if (message.getDestination().getName().endsWith("control/quit")) {  // special sample message
-                    System.out.println(">>> QUIT message received, shutting down.");  // example of command-and-control w/msgs
-                    isShutdown = true;
                 }
             }
 
@@ -103,8 +100,7 @@ public class DirectSubscriber {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/>"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "control/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/>"));
         consumer.start();
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
