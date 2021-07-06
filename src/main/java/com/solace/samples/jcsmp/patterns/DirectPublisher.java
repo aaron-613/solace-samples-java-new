@@ -111,14 +111,14 @@ public class DirectPublisher {
             byte[] payload = new byte[PAYLOAD_SIZE];  // preallocate memory, for reuse, for performance
             while (!isShutdown) {
                 try {
-                    // each loop, change the payload, less trivial
+                    // each loop, change the payload, less trivial example than static payload
                     char chosenCharacter = (char)(Math.round(msgSentCounter % 26) + 65);  // rotate through letters [A-Z]
                     Arrays.fill(payload,(byte)chosenCharacter);  // fill the payload completely with that char
                     message.setData(payload);
                     message.setApplicationMessageId(UUID.randomUUID().toString());  // as an example of a header
                     // dynamic topics!!  "solace/samples/jcsmp/direct/pub/A"
                     String topicString = new StringBuilder(TOPIC_PREFIX).append(API.toLowerCase())
-                            .append("/direct/pub/").append(chosenCharacter).toString();
+                            .append("/direct/pub/").append(chosenCharacter).toString();  // StringBuilder faster than +
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
                     message.reset();   // reuse this message, to avoid having to recreate it: better performance
@@ -129,7 +129,7 @@ public class DirectPublisher {
                     }
                 } finally {  // add a delay between messages
                     try {
-                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        Thread.sleep(0);//1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;
@@ -145,7 +145,7 @@ public class DirectPublisher {
         while (System.in.available() == 0 && !isShutdown) {
             try {
                 Thread.sleep(1000);
-                System.out.printf("%s Published msgs/s: %,d%n",API,msgSentCounter);  // simple way of calculating message rates
+                System.out.printf("%s %s Published msgs/s: %,d%n",API,SAMPLE_NAME,msgSentCounter);  // simple way of calculating message rates
                 msgSentCounter = 0;
             } catch (InterruptedException e) {
                 // Thread.sleep() interrupted... probably getting shut down

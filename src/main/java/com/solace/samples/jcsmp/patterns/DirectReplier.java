@@ -39,6 +39,7 @@ public class DirectReplier {
 
     private static final String SAMPLE_NAME = DirectReplier.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
 
     private static volatile boolean isShutdown = false;
 
@@ -83,8 +84,8 @@ public class DirectReplier {
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n",cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
+                if (cause instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 }
             }
         });
@@ -94,7 +95,8 @@ public class DirectReplier {
             @Override
             public void onReceive(BytesXMLMessage requestMsg) {
                 if (requestMsg.getDestination().getName().contains("direct/request") && requestMsg.getReplyTo() != null) {
-                    System.out.printf(">> Received request on '%s', generating response.%n", requestMsg.getDestination());
+                    System.out.printf(">> %s %s received request on '%s', generating response.%n",
+                            API,SAMPLE_NAME,requestMsg.getDestination());
                     System.out.println(requestMsg.dump());
                     TextMessage replyMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);  // reply with a Text
                     if (requestMsg.getApplicationMessageId() != null) {
@@ -107,8 +109,8 @@ public class DirectReplier {
                         producer.sendReply(requestMsg, replyMsg);  // convenience method: copies in reply-to, correlationId, etc.
                     } catch (JCSMPException e) {
                         System.out.printf("### Caught while trying to producer.sendReply(): %s%n", e);
-                        if (e instanceof JCSMPTransportException) {  // unrecoverable
-                            isShutdown = true;
+                        if (e instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                            isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                         }
                     }
                 } else {
@@ -122,14 +124,14 @@ public class DirectReplier {
             }
         });
 
+        // subscribe to 'solace/samples/*/direct/request' ... the * is to match any pub
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/request"));
         // for use with Solace HTTP MicroGateway feature, will respond to REST GET request on same URI
         // try doing: curl -u default:default http://localhost:9000/solace/samples/rest/direct/request
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic("GET/" + TOPIC_PREFIX + "*/direct/request"));
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "control/>"));
         cons.start();
 
-        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
+        System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         while (System.in.available() == 0 && !isShutdown) {
             try {
                 Thread.sleep(1000);  // wait 1 second

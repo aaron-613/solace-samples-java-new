@@ -106,8 +106,8 @@ public class DirectRequestorBlocking {
             try {
                 requestMsg.setText(String.format("Hello, this is reqeust #%d", msgSentCounter));
                 // topic should look like 'solace/samples/jcsmp/direct/request'
-                Topic topic = JCSMPFactory.onlyInstance().createTopic(
-                        TOPIC_PREFIX + API.toLowerCase() + "/direct/request");
+                String topicString = TOPIC_PREFIX + API.toLowerCase() + "/direct/request";
+                Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
                 System.out.printf(">> About to send request message #%d to topic '%s'...%n", msgSentCounter, topic.getName());
                 Requestor requestor = session.createRequestor();  // create the useful Requestor object, Direct only
                 msgSentCounter++;  // add one

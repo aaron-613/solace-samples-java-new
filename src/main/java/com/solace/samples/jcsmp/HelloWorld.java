@@ -44,10 +44,11 @@ public class HelloWorld {
     private static final String API = "JCSMP";
     private static volatile boolean isShutdown = false;           // are we done yet?
 
-    /** Simple application for doing pubsub. */
+    /** Simple application for doing pub/sub publish-subscribe  */
     public static void main(String... args) throws JCSMPException, IOException {
         if (args.length < 3) {  // Check command line arguments
-            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
+            System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n", SAMPLE_NAME);
+            System.out.printf("  e.g. %s localhost default default%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
         // User prompt, what is your name??, to use in the topic

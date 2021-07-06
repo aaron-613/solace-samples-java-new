@@ -125,6 +125,7 @@ public class DirectProcessor {
                             .append("/direct/upper/").append(inboundTopicLevels[5]).toString();
                     try {
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(outboundTopic));
+                        msgSentCounter++;
                     } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep looping (unless shutdown?)
                         System.out.printf("### Caught while trying to producer.send(): %s%n",e);
                         if (e instanceof JCSMPTransportException) {  // unrecoverable
@@ -142,7 +143,7 @@ public class DirectProcessor {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/pub/>"));  // listen to the direct publisher samples
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/pub/>"));  // listen to the direct publisher samples
         // add more subscriptions here if you want
         cons.start();
 
@@ -150,7 +151,8 @@ public class DirectProcessor {
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
             try {
                 Thread.sleep(1000);  // take a pause
-                System.out.printf("%s Received|Published msgs/s: %,d|%,d%n",API,msgRecvCounter,msgSentCounter);  // simple way of calculating message rates
+                System.out.printf("%s %s Received -> Published msgs/s: %,d -> %,d%n",
+                        API,SAMPLE_NAME,msgRecvCounter,msgSentCounter);  // simple way of calculating message rates
                 msgRecvCounter = 0;
                 msgSentCounter = 0;
             } catch (InterruptedException e) {
