@@ -50,7 +50,7 @@ public class GuaranteedPublisher {
     
     private static final String SAMPLE_NAME = GuaranteedPublisher.class.getSimpleName();
     static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
-
+    private static final String API = "JCSMP";
     private static final int PUBLISH_WINDOW_SIZE = 50;
     private static final int APPROX_MSG_RATE_PER_SEC = 100;
     private static final int PAYLOAD_SIZE = 512;
@@ -66,7 +66,7 @@ public class GuaranteedPublisher {
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        logger.info(SAMPLE_NAME + " initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -93,7 +93,7 @@ public class GuaranteedPublisher {
         XMLMessageProducer producer = session.getMessageProducer(new PublishCallbackHandler(), new JCSMPProducerEventHandler() {
             @Override
             public void handleEvent(ProducerEventArgs event) {
-                // as of v10.10, this event only occurs when republishing unACKed messages on an unknown flow (DR failover)
+                // as of JCSMP v10.10, this event only occurs when republishing unACKed messages on an unknown flow (DR failover)
                 logger.info("*** Received a producer event: " + event);
             }
         });
@@ -101,7 +101,8 @@ public class GuaranteedPublisher {
         ExecutorService publishThread = Executors.newSingleThreadExecutor();
         publishThread.submit(() -> {
             byte[] payload = new byte[PAYLOAD_SIZE];
-            System.out.println("Publishing to topic '"+ TOPIC_PREFIX + "jcsmp/pers/pub/...', please ensure queue has matching subscription."); 
+            System.out.println("Publishing to topic '"+ TOPIC_PREFIX + API.toLowerCase() + 
+                    "/pers/pub/...', please ensure queue has matching subscription."); 
             try {
                 while (!isShutdown) {
                     BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
@@ -117,13 +118,15 @@ public class GuaranteedPublisher {
                     map.putString("sample","JCSMP GuaranteedPublisher");
                     message.setProperties(map);
                     message.setCorrelationKey(message);  // used for ACK/NACK correlation locally within the API
-                    String topicString = new StringBuilder(TOPIC_PREFIX).append("jcsmp/pers/pub/").append(chosenCharacter).toString();
-                    // NOTE: publishing to topic, so make sure GuaranteedSubscriber queue is subscribed to same topic
+                    String topicString = new StringBuilder(TOPIC_PREFIX)
+                            .append(API.toLowerCase()).append("/pers/pub/").append(chosenCharacter).toString();
+                    // NOTE: publishing to topic, so make sure GuaranteedSubscriber queue is subscribed to same topic,
+                    //       or enable "Reject Message to Sender on No Subscription Match" the client-profile
                     Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
                     producer.send(message, topic);  // message is *NOT* Guaranteed until ACK comes back to PublishCallbackHandler
                     msgSentCounter++;
                     try {
-                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);
+                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;
@@ -137,11 +140,11 @@ public class GuaranteedPublisher {
             }
         });
 
-        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
+        System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
         while (System.in.available() == 0 && !isShutdown) {
             Thread.sleep(1000);
-            System.out.printf("Published msgs/s: %,d%n", msgSentCounter);  // simple way of calculating message rates
+            System.out.printf("%s %s Published msgs/s: %,d%n",API,SAMPLE_NAME,msgSentCounter);  // simple way of calculating message rates
             msgSentCounter = 0;
         }
         isShutdown = true;   // will stop the publish thread
@@ -152,7 +155,7 @@ public class GuaranteedPublisher {
 
     ////////////////////////////////////////////////////////////////////////////
     
-    /** Very simple static inner class, used for handling ACKs/NACKs from broker. **/
+    /** Very simple static inner class, used for handling publish ACKs/NACKs from broker. **/
     private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
 
         @Override
@@ -174,8 +177,8 @@ public class GuaranteedPublisher {
                 //  - pause and retry (backoff) - maybe set a flag to slow down the publisher
             } else {  // not a NACK, but some other error (ACL violation, connection loss, message too big, ...)
                 logger.warn("### Producer handleErrorEx() callback: %s%n", cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
+                if (cause instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
                     logger.warn("Specifics: " + JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx()) + ": " + e.getResponsePhrase());
