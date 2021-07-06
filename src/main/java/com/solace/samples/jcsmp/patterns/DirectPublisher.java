@@ -104,8 +104,8 @@ public class DirectPublisher {
             }
         });
 
-        ExecutorService publishExecutor = Executors.newSingleThreadExecutor();
-        publishExecutor.submit(() -> {  // create an application thread for publishing in a loop, instead of main thread
+        ExecutorService publishThread = Executors.newSingleThreadExecutor();
+        publishThread.submit(() -> {  // create an application thread for publishing in a loop, instead of main thread
             // preallocate a binary message, reuse it each loop, for performance
             final BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
             byte[] payload = new byte[PAYLOAD_SIZE];  // preallocate memory, for reuse, for performance
@@ -129,7 +129,7 @@ public class DirectPublisher {
                     }
                 } finally {  // add a delay between messages
                     try {
-                        Thread.sleep(0);//1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
+                        Thread.sleep(1000 / APPROX_MSG_RATE_PER_SEC);  // do Thread.sleep(0) for max speed
                         // Note: STANDARD Edition Solace PubSub+ broker is limited to 10k msg/s max ingress
                     } catch (InterruptedException e) {
                         isShutdown = true;
@@ -137,19 +137,15 @@ public class DirectPublisher {
                 }
             }
             // before shutting down, you could send a "quitting" message or health/stats message or something..?
-            publishExecutor.shutdown();
+            publishThread.shutdown();
         });
 
         System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
         while (System.in.available() == 0 && !isShutdown) {
-            try {
-                Thread.sleep(1000);
-                System.out.printf("%s %s Published msgs/s: %,d%n",API,SAMPLE_NAME,msgSentCounter);  // simple way of calculating message rates
-                msgSentCounter = 0;
-            } catch (InterruptedException e) {
-                // Thread.sleep() interrupted... probably getting shut down
-            }
+            Thread.sleep(1000);
+            System.out.printf("%s %s Published msgs/s: %,d%n",API,SAMPLE_NAME,msgSentCounter);  // simple way of calculating message rates
+            msgSentCounter = 0;
         }
         isShutdown = true;
         Thread.sleep(500);

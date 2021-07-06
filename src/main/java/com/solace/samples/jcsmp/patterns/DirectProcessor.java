@@ -55,7 +55,7 @@ public class DirectProcessor {
     private static volatile boolean isShutdown = false;  // are we done yet?
 
     /** Main method. */
-    public static void main(String... args) throws JCSMPException, IOException {
+    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
@@ -149,15 +149,11 @@ public class DirectProcessor {
 
         System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
-            try {
-                Thread.sleep(1000);  // take a pause
-                System.out.printf("%s %s Received -> Published msgs/s: %,d -> %,d%n",
-                        API,SAMPLE_NAME,msgRecvCounter,msgSentCounter);  // simple way of calculating message rates
-                msgRecvCounter = 0;
-                msgSentCounter = 0;
-            } catch (InterruptedException e) {
-                // Thread.sleep() interrupted... probably getting shut down
-            }
+            Thread.sleep(1000);  // take a pause
+            System.out.printf("%s %s Received -> Published msgs/s: %,d -> %,d%n",
+                    API,SAMPLE_NAME,msgRecvCounter,msgSentCounter);  // simple way of calculating message rates
+            msgRecvCounter = 0;
+            msgSentCounter = 0;
         }
         isShutdown = true;
         session.closeSession();  // will also close producer and consumer objects

@@ -44,7 +44,7 @@ public class DirectSubscriber {
     private static volatile boolean isShutdown = false;          // are we done yet?
 
     /** the main method. */
-    public static void main(String... args) throws JCSMPException, IOException {
+    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
@@ -103,19 +103,15 @@ public class DirectSubscriber {
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/>"));
         consumer.start();
         System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
-        try {
-            while (System.in.available() == 0 && !isShutdown) {
-                Thread.sleep(1000);  // wait 1 second
-                System.out.printf("%s %s Received msgs/s: %,d%n",API,SAMPLE_NAME,msgRecvCounter);  // simple way of calculating message rates
-                msgRecvCounter = 0;
-                if (hasDetectedDiscard) {
-                    System.out.println("*** Egress discard detected *** : "
-                            + SAMPLE_NAME + " unable to keep up with full message rate");
-                    hasDetectedDiscard = false;  // only show the error once per second
-                }
+        while (System.in.available() == 0 && !isShutdown) {
+            Thread.sleep(1000);  // wait 1 second
+            System.out.printf("%s %s Received msgs/s: %,d%n",API,SAMPLE_NAME,msgRecvCounter);  // simple way of calculating message rates
+            msgRecvCounter = 0;
+            if (hasDetectedDiscard) {
+                System.out.println("*** Egress discard detected *** : "
+                        + SAMPLE_NAME + " unable to keep up with full message rate");
+                hasDetectedDiscard = false;  // only show the error once per second
             }
-        } catch (InterruptedException e) {
-            // Thread.sleep() interrupted... probably getting shut down
         }
         isShutdown = true;
         session.closeSession();  // will also close consumer object
