@@ -50,6 +50,8 @@ public class DirectProcessor {
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
     private static final String API = "JCSMP";
     
+    private static volatile int msgRecvCounter = 0;              // num messages received
+    private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;  // are we done yet?
 
     /** Main method. */
@@ -93,8 +95,8 @@ public class DirectProcessor {
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
-                    isShutdown = true;
+                if (cause instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
                     System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())
@@ -104,10 +106,11 @@ public class DirectProcessor {
             }
         });
 
-        // Simple anonymous inner-class for request handling
+        // Simple anonymous inner-class for async receiving of messages
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage inboundMsg) {
+                msgRecvCounter++;
                 String inboundTopic = inboundMsg.getDestination().getName();
                 if (inboundTopic.matches(TOPIC_PREFIX + ".+?/direct/pub/.*")) {  // use of regex to match variable API level
                     // how to "process" the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
@@ -147,6 +150,9 @@ public class DirectProcessor {
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
             try {
                 Thread.sleep(1000);  // take a pause
+                System.out.printf("%s Received|Published msgs/s: %,d|%,d%n",API,msgRecvCounter,msgSentCounter);  // simple way of calculating message rates
+                msgRecvCounter = 0;
+                msgSentCounter = 0;
             } catch (InterruptedException e) {
                 // Thread.sleep() interrupted... probably getting shut down
             }

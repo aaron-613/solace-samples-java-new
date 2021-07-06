@@ -94,15 +94,15 @@ public class DirectSubscriber {
             @Override
             public void onException(JCSMPException e) {  // uh oh!
                 System.out.printf("### MessageListener's onException(): %s%n",e);
-                if (e instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
-                    isShutdown = true;  // let's quit
+                if (e instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 }
             }
         });
 
         session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "/direct/>"));
         consumer.start();
-        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
+        System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         try {
             while (System.in.available() == 0 && !isShutdown) {
                 Thread.sleep(1000);  // wait 1 second

@@ -93,8 +93,8 @@ public class DirectPublisher {
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
-                    isShutdown = true;
+                if (cause instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
                     System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())
@@ -105,7 +105,7 @@ public class DirectPublisher {
         });
 
         ExecutorService publishExecutor = Executors.newSingleThreadExecutor();
-        publishExecutor.submit(() -> {  // create an application thread for publishing in a loop
+        publishExecutor.submit(() -> {  // create an application thread for publishing in a loop, instead of main thread
             // preallocate a binary message, reuse it each loop, for performance
             final BytesMessage message = JCSMPFactory.onlyInstance().createMessage(BytesMessage.class);
             byte[] payload = new byte[PAYLOAD_SIZE];  // preallocate memory, for reuse, for performance
@@ -121,11 +121,11 @@ public class DirectPublisher {
                             .append("/direct/pub/").append(chosenCharacter).toString();
                     producer.send(message,JCSMPFactory.onlyInstance().createTopic(topicString));  // send the message
                     msgSentCounter++;  // add one
-                    message.reset();  // reuse this message, to avoid having to recreate it: better performance
+                    message.reset();   // reuse this message, to avoid having to recreate it: better performance
                 } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
                     System.out.printf("### Caught while trying to producer.send(): %s%n",e);
-                    if (e instanceof JCSMPTransportException) {  // unrecoverable
-                        isShutdown = true;
+                    if (e instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                        isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                     }
                 } finally {  // add a delay between messages
                     try {
@@ -136,15 +136,11 @@ public class DirectPublisher {
                     }
                 }
             }
-            try {  // try to send a QUIT message to the other applications... (as an example of command-and-control)
-                message.reset();
-                producer.send(message,JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX+"control/quit"));
-            } catch (JCSMPException e) {
-            }
+            // before shutting down, you could send a "quitting" message or health/stats message or something..?
             publishExecutor.shutdown();
         });
 
-        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
+        System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         // block the main thread, waiting for a quit signal
         while (System.in.available() == 0 && !isShutdown) {
             try {
