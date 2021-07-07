@@ -44,6 +44,7 @@ public class DirectRequestorBlocking {
 
     private static final String SAMPLE_NAME = DirectRequestorBlocking.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
     private static final int REQUEST_TIMEOUT_MS = 3000;  // time to wait for a reply before timing out
 
     private static volatile int msgSentCounter = 0;                   // num messages sent
@@ -89,13 +90,13 @@ public class DirectRequestorBlocking {
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
-                    isShutdown = true;
+                if (cause instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 }
             }
         });
         
-        // less common use of SYNChronous consumer mode (null callback)
+        // less common use of SYNChronous blocking consumer mode (null callback)
         final XMLMessageConsumer consumer = session.getMessageConsumer((XMLMessageListener)null);
         consumer.start();  // needed to receive the responses
 
@@ -104,7 +105,9 @@ public class DirectRequestorBlocking {
         while (System.in.available() == 0 && !isShutdown) {
             try {
                 requestMsg.setText(String.format("Hello, this is reqeust #%d", msgSentCounter));
-                Topic topic = JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "jcsmp/direct/request");
+                // topic should look like 'solace/samples/jcsmp/direct/request'
+                String topicString = TOPIC_PREFIX + API.toLowerCase() + "/direct/request";
+                Topic topic = JCSMPFactory.onlyInstance().createTopic(topicString);
                 System.out.printf(">> About to send request message #%d to topic '%s'...%n", msgSentCounter, topic.getName());
                 Requestor requestor = session.createRequestor();  // create the useful Requestor object, Direct only
                 msgSentCounter++;  // add one
@@ -116,8 +119,8 @@ public class DirectRequestorBlocking {
                 System.out.println("Failed to receive a reply in " + REQUEST_TIMEOUT_MS + " msecs");
             } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
                 System.out.printf("### Caught while trying to producer.send(): %s%n", e);
-                if (e instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
+                if (e instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 }
             } catch (InterruptedException e) {
                 // Thread.sleep() interrupted... probably getting shut down

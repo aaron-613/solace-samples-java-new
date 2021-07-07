@@ -48,16 +48,19 @@ public class DirectProcessor {
 
     private static final String SAMPLE_NAME = DirectProcessor.class.getSimpleName();
     private static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
     
+    private static volatile int msgRecvCounter = 0;              // num messages received
+    private static volatile int msgSentCounter = 0;                   // num messages sent
     private static volatile boolean isShutdown = false;  // are we done yet?
 
     /** Main method. */
-    public static void main(String... args) throws JCSMPException, IOException {
+    public static void main(String... args) throws JCSMPException, IOException, InterruptedException {
         if (args.length < 3) {  // Check command line arguments
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME + " initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -92,8 +95,8 @@ public class DirectProcessor {
             @Override
             public void handleErrorEx(Object key, JCSMPException cause, long timestamp) {
                 System.out.printf("### Producer handleErrorEx() callback: %s%n", cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable, all reconnect attempts failed
-                    isShutdown = true;
+                if (cause instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
                     System.out.println(JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx())
@@ -103,24 +106,27 @@ public class DirectProcessor {
             }
         });
 
-        // Simple anonymous inner-class for request handling
+        // Simple anonymous inner-class for async receiving of messages
         final XMLMessageConsumer cons = session.getMessageConsumer(new XMLMessageListener() {
             @Override
             public void onReceive(BytesXMLMessage inboundMsg) {
+                msgRecvCounter++;
                 String inboundTopic = inboundMsg.getDestination().getName();
                 if (inboundTopic.matches(TOPIC_PREFIX + ".+?/direct/pub/.*")) {  // use of regex to match variable API level
                     // how to "process" the incoming message? maybe do a DB lookup? add some additional properties? or change the payload?
                     TextMessage outboundMsg = JCSMPFactory.onlyInstance().createMessage(TextMessage.class);
                     final String upperCaseMessage = inboundTopic.toUpperCase();  // as a silly example of "processing"
                     outboundMsg.setText(upperCaseMessage);
-                    if (inboundMsg.getApplicationMessageId() != null) {
-                        outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());  // populate for traceability
+                    if (inboundMsg.getApplicationMessageId() != null) {  // populate for traceability
+                        outboundMsg.setApplicationMessageId(inboundMsg.getApplicationMessageId());
                     }
                     String [] inboundTopicLevels = inboundTopic.split("/",6);
-                    String outboundTopic = new StringBuilder(TOPIC_PREFIX).append("jcsmp/direct/upper/").append(inboundTopicLevels[5]).toString();
+                    String outboundTopic = new StringBuilder(TOPIC_PREFIX).append(API.toLowerCase())
+                            .append("/direct/upper/").append(inboundTopicLevels[5]).toString();
                     try {
                         producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(outboundTopic));
-                    } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
+                        msgSentCounter++;
+                    } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep looping (unless shutdown?)
                         System.out.printf("### Caught while trying to producer.send(): %s%n",e);
                         if (e instanceof JCSMPTransportException) {  // unrecoverable
                             isShutdown = true;
@@ -137,17 +143,17 @@ public class DirectProcessor {
             }
         });
 
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/pub/>"));  // listen to
-        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "control/>"));
+        session.addSubscription(JCSMPFactory.onlyInstance().createTopic(TOPIC_PREFIX + "*/direct/pub/>"));  // listen to the direct publisher samples
+        // add more subscriptions here if you want
         cons.start();
 
-        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
+        System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         while (System.in.available() == 0 && !isShutdown) {  // time to loop!
-            try {
-                Thread.sleep(1000);  // take a pause
-            } catch (InterruptedException e) {
-                // Thread.sleep() interrupted... probably getting shut down
-            }
+            Thread.sleep(1000);  // take a pause
+            System.out.printf("%s %s Received -> Published msgs/s: %,d -> %,d%n",
+                    API,SAMPLE_NAME,msgRecvCounter,msgSentCounter);  // simple way of calculating message rates
+            msgRecvCounter = 0;
+            msgSentCounter = 0;
         }
         isShutdown = true;
         session.closeSession();  // will also close producer and consumer objects

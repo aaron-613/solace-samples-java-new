@@ -50,9 +50,11 @@ public class GuaranteedProcessor {
 
     private static final String SAMPLE_NAME = GuaranteedProcessor.class.getSimpleName();
     static final String TOPIC_PREFIX = "solace/samples/";  // used as the topic "root"
+    private static final String API = "JCSMP";
     private static final int PUBLISH_WINDOW_SIZE = 100;
-    private static final String QUEUE_NAME = "q_pers_proc";
+    private static final String QUEUE_NAME = "q_pers_processor";
     
+    private static volatile int msgSentCounter = 0;                 // num messages sent
     private static volatile int msgRecvCounter = 0;                 // num messages received
     private static volatile boolean isShutdown = false;             // are we done?
     private static FlowReceiver flowQueueReceiver;
@@ -66,7 +68,7 @@ public class GuaranteedProcessor {
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME + " initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -108,7 +110,7 @@ public class GuaranteedProcessor {
 
         System.out.printf("Attempting to bind to queue '%s' on the broker.%n", QUEUE_NAME);
         try {
-            // passing null for Listener, so using blocking receive(), 
+            // passing null for Listener (1st param), so example of using a blocking SYNChronous receive(), 
             flowQueueReceiver = session.createFlow(null, flow_prop, null, new FlowEventHandler() {
                 @Override
                 public void handleEvent(Object source, FlowEventArgs event) {
@@ -121,17 +123,17 @@ public class GuaranteedProcessor {
         } catch (JCSMPErrorResponseException e) {  // something else went wrong: queue not exist, queue shutdown, etc.
             logger.error(e);
             System.err.printf("%n*** Could not establish a connection to queue '%s': %s%n", QUEUE_NAME, e.getMessage());
-            System.err.println("Create queue using PubSub+ Manager WebGUI, and add subscription "+ TOPIC_PREFIX+"*/pers/>");
+            System.err.println("Create queue using PubSub+ Manager WebGUI, and add subscription "+TOPIC_PREFIX+"*/pers/pub/>");
             System.err.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
-            System.err.println("NOTE: see Queue Provision sample for how to construct queue with consumer app.");
+            System.err.println("NOTE: see QueueProvision sample for how to construct queue with consumer app.");
             System.err.println("Exiting.");
             return;
         }
         // tell the broker to start sending messages on this queue receiver
         flowQueueReceiver.start();
         // sync/blocking queue receive working now, so time to wait until done...
-        System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
+        System.out.println(API + " " + SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
         System.out.println(" * Remember to modify the queue topic subscriptions to match Publisher and Processor");
         BytesXMLMessage inboundMsg;
         
@@ -156,10 +158,11 @@ public class GuaranteedProcessor {
                 String onwardsTopic = new StringBuilder(TOPIC_PREFIX).append("jcsmp/pers/upper/").append(inboundTopicLevels[5]).toString();
                 try {
                     producer.send(outboundMsg, JCSMPFactory.onlyInstance().createTopic(onwardsTopic));
+                    msgSentCounter++;
                 } catch (JCSMPException e) {  // threw from send(), only thing that is throwing here, but keep trying (unless shutdown?)
                     System.out.printf("### Caught while trying to producer.send(): %s%n",e);
-                    if (e instanceof JCSMPTransportException) {  // unrecoverable
-                        isShutdown = true;
+                    if (e instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                        isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                     }
                 }
             } else {  // unexpected. either log or something
@@ -171,6 +174,8 @@ public class GuaranteedProcessor {
         flowQueueReceiver.stop();
         Thread.sleep(1000);
         System.out.println("Total messages received: "+msgRecvCounter);
+        System.out.println("Total messages sent: "+msgSentCounter);
+        System.out.println();
         session.closeSession();  // will also close consumer object
         System.out.println("Main thread quitting.");
     }
@@ -190,7 +195,7 @@ public class GuaranteedProcessor {
         }
     }
     
-    /** Very simple static inner class, used for handling ACKs/NACKs from broker. **/
+    /** Very simple static inner class, used for handling publish ACKs/NACKs from broker. **/
     private static class PublishCallbackHandler implements JCSMPStreamingPublishCorrelatingEventHandler {
 
         @Override
@@ -215,8 +220,8 @@ public class GuaranteedProcessor {
                 //  - pause and retry (backoff) - maybe set a flag to slow down the publisher
             } else {  // not a NACK, but some other error (ACL violation, connection loss, ...)
                 logger.warn("### Producer handleErrorEx() callback: %s%n", cause);
-                if (cause instanceof JCSMPTransportException) {  // unrecoverable
-                    isShutdown = true;
+                if (cause instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                    isShutdown = true;  // let's quit; or, could initiate a new connection attempt
                 } else if (cause instanceof JCSMPErrorResponseException) {  // might have some extra info
                     JCSMPErrorResponseException e = (JCSMPErrorResponseException)cause;
                     logger.warn("Specifics: " + JCSMPErrorResponseSubcodeEx.getSubcodeAsString(e.getSubcodeEx()) + ": " + e.getResponsePhrase());

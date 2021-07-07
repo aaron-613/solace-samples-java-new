@@ -44,6 +44,7 @@ public class GuaranteedSubscriber {
 
     private static final String SAMPLE_NAME = GuaranteedSubscriber.class.getSimpleName();
     private static final String QUEUE_NAME = "q_samples";
+    private static final String API = "JCSMP";
     
     private static volatile int msgRecvCounter = 0;                 // num messages received
     private static volatile boolean hasDetectedRedelivery = false;  // detected any messages being redelivered?
@@ -59,7 +60,7 @@ public class GuaranteedSubscriber {
             System.out.printf("Usage: %s <host:port> <message-vpn> <client-username> [password]%n%n", SAMPLE_NAME);
             System.exit(-1);
         }
-        System.out.println(SAMPLE_NAME + " initializing...");
+        System.out.println(API + " " + SAMPLE_NAME + " initializing...");
 
         final JCSMPProperties properties = new JCSMPProperties();
         properties.setProperty(JCSMPProperties.HOST, args[0]);          // host:port
@@ -110,7 +111,7 @@ public class GuaranteedSubscriber {
                     GuaranteedPublisher.TOPIC_PREFIX+"*/pers/>");
             System.err.println("  or see the SEMP CURL scripts inside the 'semp-rest-api' directory.");
             // could also try to retry, loop and retry until successfully able to connect to the queue
-            System.err.println("NOTE: see Queue Provision sample for how to construct queue with consumer app.");
+            System.err.println("NOTE: see QueueProvision sample for how to construct queue with consumer app.");
             System.err.println("Exiting.");
             return;
         }
@@ -118,18 +119,14 @@ public class GuaranteedSubscriber {
         flowQueueReceiver.start();
         // async queue receive working now, so time to wait until done...
         System.out.println(SAMPLE_NAME + " connected, and running. Press [ENTER] to quit.");
-        try {
-            while (System.in.available() == 0 && !isShutdown) {
-                Thread.sleep(1000);  // wait 1 second
-                System.out.printf("Received msgs/s: %,d%n", msgRecvCounter);  // simple way of calculating message rates
-                msgRecvCounter = 0;
-                if (hasDetectedRedelivery) {  // try shutting -> enabling the queue on the broker to see this
-                    System.out.println("*** Redelivery detected ***");
-                    hasDetectedRedelivery = false;  // only show the error once per second
-                }
+        while (System.in.available() == 0 && !isShutdown) {
+            Thread.sleep(1000);  // wait 1 second
+            System.out.printf("%s %s Received msgs/s: %,d%n",API,SAMPLE_NAME,msgRecvCounter);  // simple way of calculating message rates
+            msgRecvCounter = 0;
+            if (hasDetectedRedelivery) {  // try shutting -> enabling the queue on the broker to see this
+                System.out.println("*** Redelivery detected ***");
+                hasDetectedRedelivery = false;  // only show the error once per second
             }
-        } catch (InterruptedException e) {
-            // Thread.sleep() interrupted... probably getting shut down
         }
         isShutdown = true;
         flowQueueReceiver.stop();
@@ -161,8 +158,8 @@ public class GuaranteedSubscriber {
         @Override
         public void onException(JCSMPException e) {
             logger.warn("### Queue " + QUEUE_NAME + " Flow handler received exception.  Stopping!!", e);
-            if (e instanceof JCSMPTransportException) {
-                isShutdown = true;  // let's quit
+            if (e instanceof JCSMPTransportException) {  // all reconnect attempts failed
+                isShutdown = true;  // let's quit; or, could initiate a new connection attempt
             } else {
                 // Generally unrecoverable exception, probably need to recreate and restart the flow
                 flowQueueReceiver.close();
