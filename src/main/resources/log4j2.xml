@@ -2,20 +2,16 @@
 <Configuration status="warn" monitorInterval="30">
   <Appenders>
     <Console name="Console" target="SYSTEM_OUT">
-      <PatternLayout pattern="--LOG-- %d{HH:mm:ss.SSS} [%t] %-5level %logger{5.} - %msg%n"/>
+      <PatternLayout pattern="~LOG %level~ %d{HH:mm:ss.SSS} [%t] %-5level %logger{5.} - %msg%n"/>
     </Console>
   </Appenders>
   <Loggers>
-    <Logger name="com.solacesystems" level="info" additivity="false">
-      <AppenderRef ref="Console"/>
-    </Logger>
-    <Logger name="com.solace.samples" level="info" additivity="false">
-      <AppenderRef ref="Console"/>
-    </Logger>
-    <Logger name="com.solace.samples.GuaranteedPublisher" level="info" additivity="false">
-      <AppenderRef ref="Console"/>
-    </Logger>
-    <Root level="info">
+    <!-- you can dynamically set the log level from the command line using jvm system variables -->
+    <!-- e.g. '-Djcsmp_api_log_level=debug', or use the Gradle env variable: 'export JAVA_OPTS=-Djcsmp_api_log_level=debug' -->
+    <!-- or override this file completely by specifying your own: 'export JAVA_OPTS=log4j2-override2.xml=log4j2-override.xml' -->
+    <Logger name="com.solacesystems" level="${sys:jcsmp_api_log_level:-info}"/>
+    <Logger name="com.solace.samples" level="$sys:jcsmp_samples_log_level:-info}"/>
+    <Root level="${sys:root_log_level:-info}">
       <AppenderRef ref="Console"/>
     </Root>
   </Loggers>
