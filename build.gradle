@@ -134,10 +134,4 @@ installDist {
     destinationDir = new File(project.buildDir, 'staged')
 }
 
-//task copyLog4j(type: Copy) {
-//    from 'src/main/resources/log4j2.xml' // copies output of file produced from jar task
-//    into 'build/staged/resourcessss'
-//}
-
 assemble.dependsOn installDist
-//assemble.finalizedBy copyLog4j
