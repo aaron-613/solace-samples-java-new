@@ -70,16 +70,13 @@ dependencies {
     // include this next one if you want to use JsonLayout for log4j
     //implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.12.4'
 
-    implementation fileTree(dir: 'lib', include: '*.jar')  // temporary, for testing of stuff
+    //implementation fileTree(dir: 'lib', include: '*.jar')  // temporary, for testing of stuff
 }
 
 sourceSets {
     main {
         java {
             srcDir 'src/main/java'
-        }
-        resources {
-            srcDir 'src/dist/config'  // for log4j config file
         }
     }
 }
