@@ -59,10 +59,12 @@ Less common or less important Features?  Perhaps these should be under Features 
  - ?
 
 
-## API Logging and log4j2
+## JCSMP API Logging and log4j2
 
 The Solace JCSMP API uses Apache Commons Logging (JCL) (formerly _Jarkarta_ Commons Logging), and is therefore compatible to use with logging frameworks like log4j2.
-These samples use log4j2, as you can see inside the `build.gradle` file, as well as in `src/main/resources/`.  Log4j2 easily allows you to configure various outputs such
+Specifically, these samples use the [Commons Logging Bridge](https://logging.apache.org/log4j/log4j-2.4/log4j-jcl/index.html) to bridge logging data from JCL to log4j2.
+
+You can see the required log4j2 dependencies inside the `build.gradle` file, and the configuration file in `src/main/resources/`.  Log4j2 easily allows you to configure various outputs such
 as console, file, and many others (e.g. JMS!) for all of the JCSMP API logs.
 
 It is best practice to ensure whatever logging implementation you use, that it is configurable at runtime without having to recompile and redeploy.
