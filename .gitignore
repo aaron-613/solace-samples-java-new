@@ -10,3 +10,7 @@ bin/
 
 # Ignore VSCode settings folder
 .vscode/
+
+# Ignore temporary/testing folders
+lib/
+log/
